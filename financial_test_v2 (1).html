@@ -455,7 +455,7 @@ var _activityCheckTimer=null;
 
 function _saveSession(){
   if(!currentUser)return;
-  localStorage.setItem(MA_SESSION_KEY,JSON.stringify({user:currentUser,token:supabaseAccessToken,lastActivity:Date.now()}));
+  localStorage.setItem(MA_SESSION_KEY,JSON.stringify({user:currentUser,token:currentUser.id,lastActivity:Date.now()}));
 }
 function _clearSession(){
   localStorage.removeItem(MA_SESSION_KEY);
@@ -584,17 +584,20 @@ function lmsTab(tabId, el) {
 }
 
 function loadNoticesDash(){
-  // ダッシュボードタブのお知らせ
-  gasGet({action:'getNotices'}, function(res){
-    var el = document.getElementById('notice-list-dash');
-    if(!el) return;
-    var list = (res && res.notices) ? res.notices : [];
-    if(!list.length){el.innerHTML='<div class="notice-empty">お知らせはありません</div>';return;}
-    el.innerHTML = list.slice(0,3).map(function(n){
-      return '<div class="notice-item"><div class="notice-date">'+n.date+'</div><div class="notice-body"><div class="notice-title">'+n.title+(n.isNew?'<span class="notice-new">NEW</span>':'')+'</div><div class="notice-text">'+n.text+'</div></div></div>';
+  var el=document.getElementById('notice-list-dash');
+  if(!el)return;
+  fetch(SUPABASE_URL+'/rest/v1/notices?order=created_at.desc&limit=3',{
+    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+  }).then(function(r){return r.json();}).then(function(list){
+    if(!Array.isArray(list)||!list.length){el.innerHTML='<div class="notice-empty">お知らせはありません</div>';return;}
+    el.innerHTML=list.map(function(n){
+      var dt=new Date(n.created_at).toLocaleDateString('ja-JP');
+      var isNew=(Date.now()-new Date(n.created_at).getTime())<7*24*60*60*1000;
+      return '<div class="notice-item"><div class="notice-date">'+dt+'</div><div class="notice-body"><div class="notice-title">'+n.title+(isNew?'<span class="notice-new">NEW</span>':'')+'</div>'+(n.body?'<div class="notice-text">'+n.body.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')+'</div>':'')+'</div></div>';
     }).join('');
-  });
+  }).catch(function(){el.innerHTML='<div class="notice-empty">お知らせはありません</div>';});
 }
+
 function updateTestCards(){
   ['tameru','fuyasu'].forEach(function(id){
     var card=document.getElementById('card-'+id);
@@ -606,11 +609,18 @@ function updateTestCards(){
 function loadNotices(){
   var el=document.getElementById('notice-list');
   el.innerHTML='<div class="notice-empty">読み込み中...</div>';
-  try{gasGet({action:'getNotices'},function(res){
-    if(!res||!res.notices||!res.notices.length){el.innerHTML='<div class="notice-empty">現在お知らせはありません</div>';return;}
-    el.innerHTML=res.notices.map(function(n){return '<div class="notice-item"><div class="notice-date">'+n.date+'</div><div class="notice-body"><div class="notice-title">'+n.title+(n.isNew?'<span class="notice-new">NEW</span>':'')+'</div><div class="notice-text">'+(n.body||'')+'</div></div></div>';}).join('');
-  });}catch(e){el.innerHTML='<div class="notice-empty">現在お知らせはありません</div>';}
+  fetch(SUPABASE_URL+'/rest/v1/notices?order=created_at.desc',{
+    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+  }).then(function(r){return r.json();}).then(function(list){
+    if(!Array.isArray(list)||!list.length){el.innerHTML='<div class="notice-empty">現在お知らせはありません</div>';return;}
+    el.innerHTML=list.map(function(n){
+      var dt=new Date(n.created_at).toLocaleDateString('ja-JP');
+      var isNew=(Date.now()-new Date(n.created_at).getTime())<7*24*60*60*1000;
+      return '<div class="notice-item"><div class="notice-date">'+dt+'</div><div class="notice-body"><div class="notice-title">'+n.title+(isNew?'<span class="notice-new">NEW</span>':'')+'</div>'+(n.body?'<div class="notice-text">'+n.body.replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>')+'</div>':'')+'</div></div>';
+    }).join('');
+  }).catch(function(){el.innerHTML='<div class="notice-empty">現在お知らせはありません</div>';});
 }
+
 // ============================================================
 // CloudFront 設定
 // ============================================================
@@ -1436,7 +1446,7 @@ function closeResultDetail(){var el=document.getElementById('result-detail-modal
     var raw=localStorage.getItem(MA_SESSION_KEY);
     if(!raw)return;
     var s=JSON.parse(raw);
-    if(!s||!s.user||!s.token)return;
+    if(!s||!s.user)return;
     if(Date.now()-s.lastActivity>MA_TIMEOUT){localStorage.removeItem(MA_SESSION_KEY);return;}
     currentUser=s.user;
     supabaseAccessToken=s.token;
