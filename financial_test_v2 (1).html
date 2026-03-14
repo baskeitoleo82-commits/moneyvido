@@ -715,16 +715,20 @@ function confirmSubmit(){document.getElementById('submit-modal').classList.remov
 function submitTest(){
   if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
   var tw=document.querySelector('.timer-wrap');if(tw)tw.classList.remove('visible');
-  var aArr=[],cArr=[],pArr=[],qArr=[];
-  allQuestions.forEach(function(item){
-    var key=item.sec.id+'-'+item.qi;
-    aArr.push(answers[key]!==undefined?answers[key]:null);
-    cArr.push(item.q.answer);
-    pArr.push(item.points);
-    qArr.push({no:item.q.no,text:(item.q.text||'').replace(/<[^>]*>/g,'').substring(0,250),options:item.q.options||null});
-  });
   completedTests[currentTestId]=true;
-  (function(){
+  // ── 画面遷移（必ず実行）──
+  document.getElementById('result-title').textContent=(currentTestId==='tameru'?'貯める力':'増やす力')+'  完了！';
+  showScreen('result');updateTestCards();
+  // ── 採点・DB保存（非同期、画面遷移後）──
+  try {
+    var aArr=[],cArr=[],pArr=[],qArr=[];
+    allQuestions.forEach(function(item){
+      var key=item.sec.id+'-'+item.qi;
+      aArr.push(answers[key]!==undefined?answers[key]:null);
+      cArr.push(item.q.answer);
+      pArr.push(item.points);
+      qArr.push({no:item.q.no,text:(item.q.text||'').replace(/<[^>]*>/g,'').substring(0,250),options:item.q.options||null});
+    });
     function chkOk(a,c){
       if(Array.isArray(c)){
         if(!Array.isArray(a)||a.length!==c.length)return false;
@@ -748,6 +752,7 @@ function submitTest(){
       body:JSON.stringify({user_id:currentUser.id,test_id:currentTestId,score:totalPoints,max_score:maxPoints,name:currentUser.name,email:currentUser.email})
     }).then(function(r){return r.json();}).then(function(d){
       var rid=(Array.isArray(d)?d[0]:d).id;
+      if(!rid)return;
       var rows=aArr.map(function(a,i){
         var c=cArr[i],q=qArr[i],ok=chkOk(a,c),pts=pArr[i];
         return {result_id:rid,test_id:currentTestId,user_id:currentUser.id,
@@ -755,11 +760,9 @@ function submitTest(){
           user_answer:fmtVal(a,q),correct_answer:fmtVal(c,q),
           is_correct:ok,points:pts,earned_points:ok?pts:0};
       });
-      fetch(SB_URL+'/rest/v1/test_answers',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(rows)});
+      fetch(SB_URL+'/rest/v1/test_answers',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(rows)}).catch(function(){});
     }).catch(function(){});
-    document.getElementById('result-title').textContent=(currentTestId==='tameru'?'貯める力':'増やす力')+'  完了！';
-    showScreen('result');updateTestCards();
-  })();
+  } catch(e){}
 }
 
 const TAMERU_SECTIONS = [
