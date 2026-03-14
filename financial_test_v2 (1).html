@@ -438,6 +438,13 @@ function goToDashboard(){
     var lmsName=document.getElementById('lms-user-name');if(lmsName)lmsName.textContent=currentUser.name;
     document.getElementById('dash-welcome-name').textContent=currentUser.name+' さん、こんにちは！';
     document.getElementById('intro-username').textContent=currentUser.name;
+    // 過去の受験結果をDBから読み込み
+    fetch(SUPABASE_URL+'/rest/v1/test_results?user_id=eq.'+currentUser.id+'&select=test_id',{
+      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+(supabaseAccessToken||SUPABASE_KEY)}
+    }).then(function(r){return r.json();}).then(function(d){
+      if(Array.isArray(d))d.forEach(function(r){completedTests[r.test_id]=true;});
+      updateTestCards();
+    }).catch(function(){});
     updateTestCards();
     loadLectures();
     try{loadNoticesDash();}catch(e){}
@@ -746,9 +753,9 @@ function submitTest(){
     }
     var totalPoints=aArr.reduce(function(t,a,i){return chkOk(a,cArr[i])?t+pArr[i]:t;},0);
     var maxPoints=pArr.reduce(function(a,b){return a+b;},0);
-    fetch(SB_URL+'/rest/v1/test_results',{
+    fetch(SUPABASE_URL+'/rest/v1/test_results',{
       method:'POST',
-      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+(supabaseAccessToken||SUPABASE_KEY),'Content-Type':'application/json','Prefer':'return=representation'},
       body:JSON.stringify({user_id:currentUser.id,test_id:currentTestId,score:totalPoints,max_score:maxPoints,name:currentUser.name,email:currentUser.email})
     }).then(function(r){return r.json();}).then(function(d){
       var rid=(Array.isArray(d)?d[0]:d).id;
@@ -760,7 +767,7 @@ function submitTest(){
           user_answer:fmtVal(a,q),correct_answer:fmtVal(c,q),
           is_correct:ok,points:pts,earned_points:ok?pts:0};
       });
-      fetch(SB_URL+'/rest/v1/test_answers',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(rows)}).catch(function(){});
+      fetch(SUPABASE_URL+'/rest/v1/test_answers',{method:'POST',headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+(supabaseAccessToken||SUPABASE_KEY),'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(rows)}).catch(function(){});
     }).catch(function(){});
   } catch(e){}
 }
