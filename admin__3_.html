@@ -256,9 +256,28 @@ tbody tr:hover td{background:var(--bg)}
 
 <script>
 const ADMIN_PASSWORD = 'moneyacademy2024'; // ← 変更してください
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbx3kZhpUzjY22rH59LhyIFBPzTKBLDtex-Jsm2h71cwkM1lYtW1STcTPVEESaDm9Bp4/exec';
+const SB_URL = 'https://bhdvgufebehxxbnakfno.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJoZHZndWZlYmVoeHhibmFrZm5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyOTc1MjIsImV4cCI6MjA4ODg3MzUyMn0.1TIO76G8B6TN6METtLUcLa6VYHvnuXnlLBbDvzzkFLA';
 
-let tameruData=[], fuyasuData=[], idList=JSON.parse(localStorage.getItem('ma_ids_v2')||'[]'), noticesData=[];
+let tameruData=[], fuyasuData=[], sbStudents=[], noticesData=[];
+
+// ── Supabase ──
+async function sbFetch(path, method, body){
+  var opts={method:method||'GET',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':method==='POST'?'return=minimal':'return=representation'}};
+  if(body) opts.body=JSON.stringify(body);
+  try{
+    var res=await fetch(SB_URL+'/rest/v1/'+path,opts);
+    if(method==='POST'||method==='DELETE'||method==='PATCH') return res.ok;
+    if(!res.ok) return [];
+    return await res.json();
+  }catch(e){return method==='GET'?[]:false;}
+}
+async function sbAuth(path, body){
+  try{
+    var res=await fetch(SB_URL+'/auth/v1/'+path,{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json'},body:JSON.stringify(body)});
+    return await res.json();
+  }catch(e){return null;}
+}
 
 // ── Login ──
 function doLogin(){
@@ -284,30 +303,21 @@ function showPage(id, el){
   document.getElementById('page-'+id).classList.add('active');
   if(el) el.classList.add('active');
   if(id==='students') renderStudents();
-  if(id==='ids') renderIDs();
+  if(id==='ids') loadAndRenderIDs();
   if(id==='notices') loadNotices();
   if(id==='lectures') loadLectureAdmin();
 }
 
-// ── GAS通信 ──
-function gasGet(params, cb){
-  const cbName='gas_'+Date.now();
-  params.callback=cbName;
-  const url=GAS_URL+'?'+Object.entries(params).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
-  window[cbName]=res=>{cb(res);delete window[cbName];};
-  const s=document.createElement('script');
-  s.src=url; s.onerror=()=>cb({status:'error'});
-  document.head.appendChild(s);
-  setTimeout(()=>{if(window[cbName]){cb({status:'timeout'});delete window[cbName];}},10000);
-}
-
 // ── Load All ──
-function loadAll(){
+async function loadAll(){
   document.getElementById('last-updated').textContent='読み込み中…';
-  let done=0;
-  const check=()=>{if(++done===2)renderDashboard();};
-  gasGet({action:'getSheet',testId:'tameru'},res=>{tameruData=res.rows||[];check();});
-  gasGet({action:'getSheet',testId:'fuyasu'},res=>{fuyasuData=res.rows||[];check();});
+  var [tameru, fuyasu] = await Promise.all([
+    sbFetch('test_results?test_id=eq.tameru&order=submitted_at.desc'),
+    sbFetch('test_results?test_id=eq.fuyasu&order=submitted_at.desc')
+  ]);
+  tameruData=(tameru||[]).map(r=>[r.submitted_at,r.name||'不明',r.email||'',r.user_id,r.test_id,r.score,r.max_score]);
+  fuyasuData=(fuyasu||[]).map(r=>[r.submitted_at,r.name||'不明',r.email||'',r.user_id,r.test_id,r.score,r.max_score]);
+  renderDashboard();
   document.getElementById('last-updated').textContent='最終更新：'+new Date().toLocaleString('ja-JP');
 }
 
@@ -315,7 +325,7 @@ function loadAll(){
 function renderDashboard(){
   const tIds=new Set(tameruData.map(r=>r[3]));
   const fIds=new Set(fuyasuData.map(r=>r[3]));
-  const allIds=new Set([...tIds,...fIds,...idList.map(i=>i.id)]);
+  const allIds=new Set([...tIds,...fIds,...sbStudents.map(s=>s.auth_user_id||s.student_id)]);
   document.getElementById('stat-total').textContent=allIds.size;
   document.getElementById('stat-tameru').textContent=tIds.size;
   document.getElementById('stat-fuyasu').textContent=fIds.size;
@@ -346,20 +356,20 @@ function renderDashTable(elId, rows){
 // ── Students ──
 function buildStudentMap(){
   const map={};
-  [...idList].forEach(e=>{
-    map[e.id]={name:e.name,email:e.email,sid:e.id,tameru:null,fuyasu:null};
+  sbStudents.forEach(e=>{
+    map[e.email||e.student_id]={name:e.name,email:e.email,sid:e.student_id,tameru:null,fuyasu:null};
   });
   tameruData.forEach(r=>{
-    const sid=r[3];
-    if(!map[sid]) map[sid]={name:r[1],email:r[2],sid,tameru:null,fuyasu:null};
+    const key=r[2]||r[3];
+    if(!map[key]) map[key]={name:r[1],email:r[2],sid:r[3],tameru:null,fuyasu:null};
     const s=parseFloat(r[5])||0,m=parseFloat(r[6])||100;
-    if(!map[sid].tameru||s>map[sid].tameru.score) map[sid].tameru={score:s,max:m,date:r[0]};
+    if(!map[key].tameru||s>map[key].tameru.score) map[key].tameru={score:s,max:m,date:r[0]};
   });
   fuyasuData.forEach(r=>{
-    const sid=r[3];
-    if(!map[sid]) map[sid]={name:r[1],email:r[2],sid,tameru:null,fuyasu:null};
+    const key=r[2]||r[3];
+    if(!map[key]) map[key]={name:r[1],email:r[2],sid:r[3],tameru:null,fuyasu:null};
     const s=parseFloat(r[5])||0,m=parseFloat(r[6])||100;
-    if(!map[sid].fuyasu||s>map[sid].fuyasu.score) map[sid].fuyasu={score:s,max:m,date:r[0]};
+    if(!map[key].fuyasu||s>map[key].fuyasu.score) map[key].fuyasu={score:s,max:m,date:r[0]};
   });
   return map;
 }
@@ -396,142 +406,133 @@ function renderStudents(){
 }
 
 // ── ID管理 ──
-function generateID(){
+async function loadAndRenderIDs(){
+  sbStudents = await sbFetch('students?order=created_at.desc') || [];
+  renderIDs();
+}
+
+async function generateID(){
   var name   = document.getElementById('new-name').value.trim();
   var email  = document.getElementById('new-email').value.trim();
   var pw     = document.getElementById('new-pw').value.trim();
-  var prefix = document.getElementById('new-prefix').value.trim();
-  if(!prefix) prefix = 'MA';
-  if(!name || !pw){ showToast('氏名とパスワードを入力してください'); return; }
+  var prefix = document.getElementById('new-prefix').value.trim() || 'MA';
+  if(!name||!pw||!email){showToast('氏名・メール・パスワードを入力してください');return;}
 
-  // 重複しないランダム4桁
-  var num, id, tries = 0;
-  do {
-    num = String(Math.floor(Math.random() * 9000) + 1000);
-    id  = prefix + '-' + num;
-    tries++;
-  } while(idList.some(function(e){ return e.id === id; }) && tries < 100);
+  var num, studentId, tries=0;
+  do{
+    num=String(Math.floor(Math.random()*9000)+1000);
+    studentId=prefix+'-'+num; tries++;
+  }while(sbStudents.some(e=>e.student_id===studentId)&&tries<100);
 
-  var entry = {
-    id:        id,
-    name:      name,
-    email:     email,
-    password:  pw,
-    createdAt: new Date().toLocaleString('ja-JP'),
-    active:    true
-  };
-  idList.push(entry);
-  localStorage.setItem('ma_ids_v2', JSON.stringify(idList));
+  var authRes = await sbAuth('signup',{email:email,password:pw,data:{name:name}});
+  var authUserId = (authRes&&authRes.user&&authRes.user.id)?authRes.user.id:'';
 
-  gasGet({action:'addStudent', id:id, name:name, email:email, password:pw}, function(res){
-    if(res.status === 'ok') showToast('ID発行しました：' + id);
-    else showToast('ID発行しました（GAS記録エラー）：' + id);
-  });
-
-  document.getElementById('new-name').value  = '';
-  document.getElementById('new-email').value = '';
-  document.getElementById('new-pw').value    = '';
-  renderIDs();
+  var ok = await sbFetch('students','POST',{student_id:studentId,name:name,email:email,password:pw,active:true,auth_user_id:authUserId});
+  if(ok!==false){
+    showToast('ID発行しました：'+studentId);
+    document.getElementById('new-name').value='';
+    document.getElementById('new-email').value='';
+    document.getElementById('new-pw').value='';
+    loadAndRenderIDs();
+  }else{
+    showToast('ID発行に失敗しました');
+  }
 }
 
-function toggleIDActive(idx){
-  idList[idx].active=!idList[idx].active;
-  localStorage.setItem('ma_ids_v2',JSON.stringify(idList));
-  renderIDs();
+async function toggleIDActive(studentId, currentActive){
+  await sbFetch('students?student_id=eq.'+encodeURIComponent(studentId),'PATCH',{active:!currentActive});
+  loadAndRenderIDs();
 }
 
-function deleteID(idx){
-  if(!confirm('「' + idList[idx].name + '」（' + idList[idx].id + '）を削除しますか？\nこの操作は元に戻せません。'))return;
-  idList.splice(idx,1);
-  localStorage.setItem('ma_ids_v2',JSON.stringify(idList));
+async function deleteID(studentId, name){
+  if(!confirm('「'+name+'」（'+studentId+'）を削除しますか？'))return;
+  await sbFetch('students?student_id=eq.'+encodeURIComponent(studentId),'DELETE');
   showToast('削除しました');
-  renderIDs();
+  loadAndRenderIDs();
 }
 
 function renderIDs(){
   const el=document.getElementById('ids-table');
-  if(!idList.length){el.innerHTML='<div class="empty-state"><div class="empty-icon"></div>まだIDが発行されていません</div>';return;}
+  if(!sbStudents.length){el.innerHTML='<div class="empty-state"><div class="empty-icon"></div>まだIDが発行されていません</div>';return;}
   const map=buildStudentMap();
-  el.innerHTML=`<table><thead><tr><th>受講生ID</th><th>氏名</th><th>メール</th><th>パスワード</th><th>発行日時</th><th>テスト状況</th><th>状態</th><th></th></tr></thead>
-  <tbody>${idList.map((e,i)=>{
-    const s=map[e.id];
+  el.innerHTML='<table><thead><tr><th>受講生ID</th><th>氏名</th><th>メール</th><th>パスワード</th><th>発行日時</th><th>テスト状況</th><th>状態</th><th></th></tr></thead><tbody>'
+  +sbStudents.map(e=>{
+    const s=map[e.email||e.student_id];
     const ht=s&&s.tameru,hf=s&&s.fuyasu;
     const status=ht&&hf?'<span class="badge badge-green">両方完了</span>':ht?'<span class="badge badge-yellow">貯める完了</span>':hf?'<span class="badge badge-yellow">増やす完了</span>':'<span class="badge badge-gray">未受験</span>';
-    return `<tr>
-      <td class="mono"><strong>${e.id}</strong></td>
-      <td>${e.name}</td>
-      <td style="color:var(--text-muted)">${e.email||'—'}</td>
-      <td class="mono">${e.password||'—'}</td>
-      <td style="color:var(--text-muted);font-size:12px">${e.createdAt}</td>
-      <td>${status}</td>
-      <td>${e.active?'<span class="badge badge-green">有効</span>':'<span class="badge badge-red">無効</span>'}</td>
-      <td style="display:flex;gap:.4rem;">
-        <button class="btn btn-outline btn-sm" onclick="toggleIDActive(${i})">${e.active?'無効化':'有効化'}</button>
-        <button class="btn btn-red btn-sm" onclick="deleteID(${i})">削除</button>
-      </td>
-    </tr>`;
-  }).join('')}</tbody></table>`;
+    const createdAt=e.created_at?new Date(e.created_at).toLocaleString('ja-JP'):'—';
+    const safeId=(e.student_id||'').replace(/'/g,"\\'");
+    const safeName=(e.name||'').replace(/'/g,"\\'");
+    return '<tr>'
+      +'<td class="mono"><strong>'+e.student_id+'</strong></td>'
+      +'<td>'+e.name+'</td>'
+      +'<td style="color:var(--text-muted)">'+(e.email||'—')+'</td>'
+      +'<td class="mono">'+(e.password||'—')+'</td>'
+      +'<td style="color:var(--text-muted);font-size:12px">'+createdAt+'</td>'
+      +'<td>'+status+'</td>'
+      +'<td>'+(e.active?'<span class="badge badge-green">有効</span>':'<span class="badge badge-red">無効</span>')+'</td>'
+      +'<td style="display:flex;gap:.4rem;">'
+      +'<button class="btn btn-outline btn-sm" onclick="toggleIDActive(\''+safeId+'\','+e.active+')">'+(e.active?'無効化':'有効化')+'</button>'
+      +'<button class="btn btn-red btn-sm" onclick="deleteID(\''+safeId+'\',\''+safeName+'\')">削除</button>'
+      +'</td></tr>';
+  }).join('')+'</tbody></table>';
 }
 
 function exportIDs(){
-  if(!idList.length){showToast('IDがありません');return;}
+  if(!sbStudents.length){showToast('IDがありません');return;}
   const rows=[['受講生ID','氏名','メールアドレス','パスワード','発行日時','状態'],
-    ...idList.map(e=>[e.id,e.name,e.email||'',e.password||'',e.createdAt,e.active?'有効':'無効'])];
+    ...sbStudents.map(e=>[e.student_id,e.name,e.email||'',e.password||'',e.created_at||'',e.active?'有効':'無効'])];
   downloadCSV(rows,'ma_id_list.csv');
   showToast('IDリストをダウンロードしました');
 }
 
 // ── お知らせ ──
-function loadNotices(){
-  gasGet({action:'getNotices'},res=>{
-    noticesData=res.notices||[];
-    renderNotices();
-  });
+async function loadNotices(){
+  var data=await sbFetch('notices?order=created_at.desc');
+  noticesData=Array.isArray(data)?data:[];
+  renderNotices();
 }
 
-function postNotice(){
+async function postNotice(){
   const title=document.getElementById('notice-title').value.trim();
   const body=document.getElementById('notice-body').value.trim();
   if(!title){showToast('タイトルを入力してください');return;}
-  gasGet({action:'addNotice',title,body},res=>{
-    if(res.status==='ok'){
-      showToast('お知らせを投稿しました');
-      document.getElementById('notice-title').value='';
-      document.getElementById('notice-body').value='';
-      loadNotices();
-    }else{
-      showToast('投稿に失敗しました');
-    }
-  });
+  var ok=await sbFetch('notices','POST',{title:title,body:body});
+  if(ok){
+    showToast('お知らせを投稿しました');
+    document.getElementById('notice-title').value='';
+    document.getElementById('notice-body').value='';
+    loadNotices();
+  }else{
+    showToast('投稿に失敗しました');
+  }
 }
 
-function deleteNotice(row){
+async function deleteNotice(id){
   if(!confirm('このお知らせを削除しますか？'))return;
-  gasGet({action:'deleteNotice',row},res=>{
-    if(res.status==='ok'){showToast('削除しました');loadNotices();}
-  });
+  await sbFetch('notices?id=eq.'+id,'DELETE');
+  showToast('削除しました');
+  loadNotices();
 }
 
 function renderNotices(){
   const el=document.getElementById('notices-table');
   if(!noticesData.length){el.innerHTML='<div class="empty-state"><div class="empty-icon"></div>お知らせはありません</div>';return;}
-  el.innerHTML=`<table><thead><tr><th>日付</th><th>タイトル</th><th>本文</th><th></th></tr></thead>
-  <tbody>${noticesData.map(n=>`<tr>
-    <td style="white-space:nowrap;color:var(--text-muted);font-size:12px">${n.date}${n.isNew?'<span class="badge badge-navy" style="margin-left:.4rem">NEW</span>':''}</td>
-    <td><strong>${n.title}</strong></td>
-    <td style="color:var(--text-muted)">${n.body||'—'}</td>
-    <td><button class="btn btn-red btn-sm" onclick="deleteNotice(${n.row})">削除</button></td>
-  </tr>`).join('')}</tbody></table>`;
+  el.innerHTML='<table><thead><tr><th>日付</th><th>タイトル</th><th>本文</th><th></th></tr></thead><tbody>'
+  +noticesData.map(n=>'<tr>'
+    +'<td style="white-space:nowrap;color:var(--text-muted);font-size:12px">'+new Date(n.created_at).toLocaleString('ja-JP')+'</td>'
+    +'<td><strong>'+n.title+'</strong></td>'
+    +'<td style="color:var(--text-muted)">'+(n.body||'—')+'</td>'
+    +'<td><button class="btn btn-red btn-sm" onclick="deleteNotice('+n.id+')">削除</button></td>'
+    +'</tr>').join('')+'</tbody></table>';
 }
 
 // ── CSV ──
 function exportCSV(testId){
   const data=testId==='tameru'?tameruData:fuyasuData;
   if(!data.length){showToast('データがありません');return;}
-  const numQ=Math.floor((data[0].length-7)/3);
-  const header=['送信日時','名前','メールアドレス','受講生ID','テスト名','合計点','満点'];
-  for(let i=1;i<=numQ;i++) header.push('問'+i+'_回答','問'+i+'_正誤','問'+i+'_得点');
-  downloadCSV([header,...data], (testId==='tameru'?'tameru':'fuyasu')+'_results.csv');
+  const header=['送信日時','名前','メールアドレス','ユーザーID','テスト名','合計点','満点'];
+  downloadCSV([header,...data],(testId==='tameru'?'tameru':'fuyasu')+'_results.csv');
   showToast('CSVをダウンロードしました（'+data.length+'件）');
 }
 
@@ -552,16 +553,13 @@ function showToast(msg){
   toastTimer=setTimeout(()=>el.classList.remove('show'),3000);
 }
 
-// ============================================================
-// 講義管理
-// ============================================================
+// ── 講義管理 ──
 let lectureData = [];
 
-function loadLectureAdmin() {
-  gasGet({action:'getLectures'}, function(res) {
-    lectureData = (res && res.lectures) ? res.lectures : [];
-    renderLectures();
-  });
+async function loadLectureAdmin() {
+  var data = await sbFetch('lectures?order=sort_order.asc,created_at.asc');
+  lectureData = Array.isArray(data) ? data : [];
+  renderLectures();
 }
 
 function renderLectures() {
@@ -586,41 +584,40 @@ function renderLectures() {
     }).join('') + '</tbody></table>';
 }
 
-function addLecture() {
+async function addLecture() {
   var title = document.getElementById('lec-title').value.trim();
   var url   = document.getElementById('lec-url').value.trim();
   if (!title) { showToast('タイトルを入力してください'); return; }
-  gasGet({action:'addLecture', title:title, url:url}, function(res) {
-    if (res.status === 'ok') {
-      showToast('追加しました：' + title);
-      document.getElementById('lec-title').value = '';
-      document.getElementById('lec-url').value   = '';
-      loadLectureAdmin();
-    } else {
-      showToast('追加に失敗しました');
-    }
-  });
+  var ok = await sbFetch('lectures','POST',{title:title,url:url,sort_order:lectureData.length});
+  if(ok){
+    showToast('追加しました：'+title);
+    document.getElementById('lec-title').value='';
+    document.getElementById('lec-url').value='';
+    loadLectureAdmin();
+  }else{
+    showToast('追加に失敗しました');
+  }
 }
 
-function deleteLecture(id) {
+async function deleteLecture(id) {
   if (!confirm('この講義を削除しますか？')) return;
-  gasGet({action:'deleteLecture', id:id}, function(res) {
-    if (res.status === 'ok') { showToast('削除しました'); loadLectureAdmin(); }
-  });
+  await sbFetch('lectures?id=eq.'+id,'DELETE');
+  showToast('削除しました');
+  loadLectureAdmin();
 }
 
-function editLecture(id, currentTitle, currentUrl) {
+async function editLecture(id, currentTitle, currentUrl) {
   var newTitle = prompt('講義タイトルを編集', currentTitle);
   if (newTitle === null) return;
   var newUrl = prompt('動画URLを編集（なければ空白）', currentUrl);
   if (newUrl === null) return;
-  gasGet({action:'editLecture', id:id, title:newTitle.trim(), url:(newUrl||'').trim()}, function(res) {
-    if (res.status === 'ok') { showToast('更新しました'); loadLectureAdmin(); }
-  });
+  await sbFetch('lectures?id=eq.'+id,'PATCH',{title:newTitle.trim(),url:(newUrl||'').trim()});
+  showToast('更新しました');
+  loadLectureAdmin();
 }
 
 // 初期化
-renderIDs();
+loadAndRenderIDs();
 </script>
 </body>
 </html>

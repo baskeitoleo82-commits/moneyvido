@@ -725,7 +725,9 @@ function submitTest(){
       user_id: currentUser.id,
       test_id: currentTestId,
       score: totalPoints,
-      max_score: maxPoints
+      max_score: maxPoints,
+      name: currentUser.name,
+      email: currentUser.email
     }).catch(function(){});
     (function(){
     document.getElementById('result-title').textContent=(currentTestId==='tameru'?'貯める力':'増やす力')+'  完了！';
