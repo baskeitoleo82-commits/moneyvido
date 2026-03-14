@@ -187,11 +187,29 @@ tbody tr:hover td{background:var(--bg)}
         <div class="form-grid">
           <div class="field"><label>氏名</label><input type="text" id="new-name" placeholder="山田 太郎"></div>
           <div class="field"><label>メールアドレス</label><input type="email" id="new-email" placeholder="taro@example.com"></div>
-          <div class="field"><label>パスワード</label><input type="text" id="new-pw" placeholder="例：pass1234"></div>
-          <div class="field"><label>ID接頭辞</label><input type="text" id="new-prefix" value="MA" maxlength="4"></div>
+          <div class="field">
+            <label>初期パスワード</label>
+            <div style="display:flex;gap:.5rem">
+              <input type="text" id="new-pw" placeholder="例：Pass1234" style="flex:1">
+              <button class="btn btn-outline btn-sm" onclick="autoGenPw()" style="white-space:nowrap;margin-bottom:.85rem">自動生成</button>
+            </div>
+          </div>
         </div>
         <button class="btn btn-primary" onclick="generateID()">+ ID発行</button>
       </div>
+
+      <!-- 発行完了カード -->
+      <div id="issued-card" style="display:none;background:#f0f9ff;border:2px solid var(--accent);border-radius:8px;padding:1.5rem;margin-bottom:1.25rem">
+        <div style="font-size:13px;font-weight:700;color:var(--accent);margin-bottom:.75rem">✅ ID発行完了 — 以下の情報を受講生に共有してください</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1rem">
+          <div><div style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:.08em;margin-bottom:.25rem">氏名</div><div id="ic-name" style="font-size:15px;font-weight:700"></div></div>
+          <div><div style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:.08em;margin-bottom:.25rem">受講生ID</div><div id="ic-id" style="font-size:15px;font-weight:700;font-family:monospace"></div></div>
+          <div><div style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:.08em;margin-bottom:.25rem">メールアドレス</div><div id="ic-email" style="font-size:15px"></div></div>
+          <div><div style="font-size:11px;color:var(--text-muted);font-weight:700;letter-spacing:.08em;margin-bottom:.25rem">初期パスワード</div><div id="ic-pw" style="font-size:15px;font-weight:700;font-family:monospace"></div></div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="copyIssuedInfo()">クリップボードにコピー</button>
+      </div>
+
       <div class="table-wrap">
         <div class="table-header">
           <div class="table-title">発行済みID一覧</div>
@@ -533,17 +551,23 @@ async function loadAndRenderIDs(){
   renderIDs();
 }
 
+function autoGenPw(){
+  var chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  var pw='';for(var i=0;i<10;i++)pw+=chars[Math.floor(Math.random()*chars.length)];
+  document.getElementById('new-pw').value=pw;
+}
+
+var _lastIssued=null;
 async function generateID(){
   var name   = document.getElementById('new-name').value.trim();
   var email  = document.getElementById('new-email').value.trim();
   var pw     = document.getElementById('new-pw').value.trim();
-  var prefix = document.getElementById('new-prefix').value.trim() || 'MA';
   if(!name||!pw||!email){showToast('氏名・メール・パスワードを入力してください');return;}
 
   var num, studentId, tries=0;
   do{
-    num=String(Math.floor(Math.random()*9000)+1000);
-    studentId=prefix+'-'+num; tries++;
+    num=String(Math.floor(Math.random()*900000)+100000);
+    studentId='MA'+num; tries++;
   }while(sbStudents.some(e=>e.student_id===studentId)&&tries<100);
 
   var authRes = await sbAuth('signup',{email:email,password:pw,data:{name:name}});
@@ -551,14 +575,26 @@ async function generateID(){
 
   var ok = await sbFetch('students','POST',{student_id:studentId,name:name,email:email,password:pw,active:true,auth_user_id:authUserId});
   if(ok!==false){
-    showToast('ID発行しました：'+studentId);
+    _lastIssued={name:name,id:studentId,email:email,pw:pw};
+    document.getElementById('ic-name').textContent=name;
+    document.getElementById('ic-id').textContent=studentId;
+    document.getElementById('ic-email').textContent=email;
+    document.getElementById('ic-pw').textContent=pw;
+    document.getElementById('issued-card').style.display='block';
     document.getElementById('new-name').value='';
     document.getElementById('new-email').value='';
     document.getElementById('new-pw').value='';
+    showToast('ID発行しました：'+studentId);
     loadAndRenderIDs();
   }else{
     showToast('ID発行に失敗しました');
   }
+}
+
+function copyIssuedInfo(){
+  if(!_lastIssued)return;
+  var text='【受講生情報】\n氏名：'+_lastIssued.name+'\n受講生ID：'+_lastIssued.id+'\nメールアドレス：'+_lastIssued.email+'\n初期パスワード：'+_lastIssued.pw;
+  navigator.clipboard.writeText(text).then(function(){showToast('コピーしました');}).catch(function(){showToast('コピーに失敗しました');});
 }
 
 async function toggleIDActive(studentId, currentActive){
