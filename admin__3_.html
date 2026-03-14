@@ -418,7 +418,7 @@ function showPage(id, el){
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+id).classList.add('active');
   if(el) el.classList.add('active');
-  if(id==='students') renderStudents();
+  if(id==='students'){sbFetch('students?order=created_at.desc').then(function(d){sbStudents=d||[];renderStudents();});}
   if(id==='ids') loadAndRenderIDs();
   if(id==='notices') loadNotices();
   if(id==='lectures') loadLectureAdmin();
@@ -501,6 +501,23 @@ async function exportAnswerCSV(testId){
 }
 
 // ── Load All ──
+// 受講生ポータルと同じ講義リスト（進捗表示用）
+const ADMIN_LECTURE_LIST = [
+  {id:'l01',title:'ローソク足の見方'},
+  {id:'l02',title:'出来高の見方'},
+  {id:'l03',title:'テクニカル分析の原則'},
+  {id:'l04',title:'トレンドの種類'},
+  {id:'l05',title:'トレンドラインの引き方'},
+  {id:'l06',title:'トレンドラインの引き方実践'},
+  {id:'l07',title:'トレンドラインの役割・引き方'},
+  {id:'l08',title:'トレンドラインの使い方'},
+  {id:'l09',title:'トレンド別の投資判断'},
+  {id:'l10',title:'水平線の引き方'},
+  {id:'l11',title:'水平線を引いてみよう【TradingView】'},
+  {id:'l12',title:'移動平均線の見方'},
+  {id:'l13',title:'TradingViewの使い方'},
+  {id:'l14',title:'銘柄スクリーニング機能を使いこなそう'},
+];
 async function loadAll(){
   document.getElementById('last-updated').textContent='読み込み中…';
   var [tameru, fuyasu] = await Promise.all([
@@ -617,11 +634,11 @@ async function openStudentDetail(studentId){
   modal.style.display='flex';
   body.innerHTML='<div class="loading"><div class="spinner"></div>読み込み中</div>';
   var student=sbStudents.find(function(s){return s.student_id===studentId;});
-  var [results,lectureProgress,lectures]=await Promise.all([
+  var [results,lectureProgress]=await Promise.all([
     sbFetch('test_results?user_id=eq.'+encodeURIComponent(studentId)+'&order=submitted_at.desc'),
-    sbFetch('lecture_progress?user_id=eq.'+encodeURIComponent(studentId)),
-    sbFetch('lectures?select=id,title&order=created_at.asc')
+    sbFetch('lecture_progress?user_id=eq.'+encodeURIComponent(studentId))
   ]);
+  var lectures=ADMIN_LECTURE_LIST;
   var name=student?student.name:studentId;
   var email=student?(student.email||'—'):'—';
   var tameru=Array.isArray(results)?results.find(function(r){return r.test_id==='tameru';}):null;
@@ -976,18 +993,18 @@ async function saveLectureEdit(){
 async function loadProgress(){
   var el=document.getElementById('progress-table');
   el.innerHTML='<div class="loading"><div class="spinner"></div>読み込み中</div>';
-  var [students,tameru,fuyasu,lectures,lectureProgress]=await Promise.all([
+  var [students,tameru,fuyasu,lectureProgress]=await Promise.all([
     sbFetch('students?order=created_at.asc'),
     sbFetch('test_results?test_id=eq.tameru&select=user_id,score,max_score'),
     sbFetch('test_results?test_id=eq.fuyasu&select=user_id,score,max_score'),
-    sbFetch('lectures?select=id'),
     sbFetch('lecture_progress?select=user_id,lecture_id')
   ]);
-  var totalLectures=(Array.isArray(lectures)?lectures.length:0);
+  var totalLectures=ADMIN_LECTURE_LIST.length;
   var tMap={},fMap={},lpMap={};
   if(Array.isArray(tameru))tameru.forEach(function(r){if(!tMap[r.user_id])tMap[r.user_id]=r;});
   if(Array.isArray(fuyasu))fuyasu.forEach(function(r){if(!fMap[r.user_id])fMap[r.user_id]=r;});
   if(Array.isArray(lectureProgress))lectureProgress.forEach(function(r){if(!lpMap[r.user_id])lpMap[r.user_id]=0;lpMap[r.user_id]++;});
+  if(Array.isArray(students))students=students.filter(function(s){return !s.is_deleted;});
   if(!Array.isArray(students)||!students.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">—</div>受講生がいません</div>';return;}
   el.innerHTML='<table><thead><tr><th>受講生ID</th><th>氏名</th><th>貯める力</th><th>増やす力</th><th>講義視聴</th><th></th></tr></thead><tbody>'
   +students.map(function(s){
