@@ -100,6 +100,15 @@ tbody tr:hover td{background:var(--bg)}
 .mono{font-family:'DM Mono',monospace;font-size:12px}
 .notice-form{display:grid;grid-template-columns:1fr 2fr auto;gap:.75rem;align-items:end}
 @media(max-width:900px){.notice-form{grid-template-columns:1fr}}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:200;display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto}
+.modal-overlay.active{display:flex}
+.modal-box{background:#fff;border-radius:8px;width:100%;max-width:1000px;display:flex;flex-direction:column;overflow:hidden;margin:auto}
+.modal-head{padding:1.25rem 1.5rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.modal-head-title{font-size:16px;font-weight:700;color:var(--navy)}
+.modal-close{background:none;border:none;font-size:24px;cursor:pointer;color:var(--text-muted);line-height:1;padding:.25rem}
+.modal-body{padding:1.25rem;overflow-x:auto}
+.correct-row td{background:#f0fdf4}
+.wrong-row td{background:#fef2f2}
 </style>
 </head>
 <body>
@@ -127,6 +136,9 @@ tbody tr:hover td{background:var(--bg)}
       <div class="nav-item" onclick="showPage('notices',this)"><span class="nav-icon">›</span>お知らせ管理</div>
       <div class="nav-item" onclick="showPage('lectures',this)"><span class="nav-icon">›</span>講義管理</div>
       <div class="nav-item" onclick="showPage('export',this)"><span class="nav-icon">›</span>CSVエクスポート</div>
+      <div class="sidebar-section">テスト結果</div>
+      <div class="nav-item" onclick="showPage('tameru',this)"><span class="nav-icon">›</span>貯める力　結果</div>
+      <div class="nav-item" onclick="showPage('fuyasu',this)"><span class="nav-icon">›</span>増やす力　結果</div>
     </nav>
     <div class="sidebar-footer"><button class="logout-btn" onclick="doLogout()">ログアウト</button></div>
   </aside>
@@ -250,8 +262,44 @@ tbody tr:hover td{background:var(--bg)}
       </div>
     </div>
 
+    <!-- 貯める力 結果 -->
+    <div class="page" id="page-tameru">
+      <div class="page-header">
+        <div><div class="page-title">貯める力　テスト結果</div><div class="page-sub">全受講生の受験結果・回答詳細</div></div>
+        <div style="display:flex;gap:.6rem">
+          <button class="btn btn-outline" onclick="loadTameruResults()">更新</button>
+          <button class="btn btn-outline btn-sm" onclick="exportAnswerCSV('tameru')">回答CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap"><div id="tameru-results-table"><div class="loading"><div class="spinner"></div>読み込み中</div></div></div>
+    </div>
+
+    <!-- 増やす力 結果 -->
+    <div class="page" id="page-fuyasu">
+      <div class="page-header">
+        <div><div class="page-title">増やす力　テスト結果</div><div class="page-sub">全受講生の受験結果・回答詳細</div></div>
+        <div style="display:flex;gap:.6rem">
+          <button class="btn btn-outline" onclick="loadFuyasuResults()">更新</button>
+          <button class="btn btn-outline btn-sm" onclick="exportAnswerCSV('fuyasu')">回答CSV</button>
+        </div>
+      </div>
+      <div class="table-wrap"><div id="fuyasu-results-table"><div class="loading"><div class="spinner"></div>読み込み中</div></div></div>
+    </div>
+
   </main>
 </div>
+
+<!-- 回答詳細モーダル -->
+<div class="modal-overlay" id="answer-modal" onclick="if(event.target===this)closeAnswerModal()">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-head-title" id="modal-title">回答詳細</div>
+      <button class="modal-close" onclick="closeAnswerModal()">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
 <div id="toast"></div>
 
 <script>
@@ -306,6 +354,80 @@ function showPage(id, el){
   if(id==='ids') loadAndRenderIDs();
   if(id==='notices') loadNotices();
   if(id==='lectures') loadLectureAdmin();
+  if(id==='tameru') loadTameruResults();
+  if(id==='fuyasu') loadFuyasuResults();
+}
+
+// ── テスト結果ページ ──
+async function loadTameruResults(){
+  var data=await sbFetch('test_results?test_id=eq.tameru&order=submitted_at.desc');
+  renderResultsTable('tameru-results-table',Array.isArray(data)?data:[]);
+}
+async function loadFuyasuResults(){
+  var data=await sbFetch('test_results?test_id=eq.fuyasu&order=submitted_at.desc');
+  renderResultsTable('fuyasu-results-table',Array.isArray(data)?data:[]);
+}
+function renderResultsTable(elId,data){
+  var el=document.getElementById(elId);
+  if(!data.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">—</div>データがありません</div>';return;}
+  el.innerHTML='<table><thead><tr><th>受験日時</th><th>氏名</th><th>メール</th><th>得点</th><th>正答率</th><th></th></tr></thead><tbody>'
+  +data.map(function(r){
+    var pct=r.max_score>0?Math.round(r.score/r.max_score*100):0;
+    var col=pct>=80?'var(--green)':pct>=60?'var(--accent)':'var(--red)';
+    var safeName=(r.name||'不明').replace(/'/g,"\\'");
+    return '<tr>'
+      +'<td style="font-size:12px;color:var(--text-muted)">'+new Date(r.submitted_at).toLocaleString('ja-JP')+'</td>'
+      +'<td><strong>'+(r.name||'不明')+'</strong></td>'
+      +'<td style="color:var(--text-muted)">'+(r.email||'—')+'</td>'
+      +'<td><span class="mono" style="font-weight:700">'+r.score+'</span><span style="color:var(--text-muted);font-size:12px"> / '+r.max_score+'</span></td>'
+      +'<td><div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:'+pct+'%;background:'+col+'"></div></div><span class="score-text">'+pct+'%</span></div></td>'
+      +'<td><button class="btn btn-outline btn-sm" onclick="openAnswerModal('+r.id+',\''+safeName+'\')">詳細</button></td>'
+      +'</tr>';
+  }).join('')+'</tbody></table>';
+}
+
+// ── 回答詳細モーダル ──
+async function openAnswerModal(resultId,name){
+  document.getElementById('modal-title').textContent=name+' の回答詳細';
+  document.getElementById('modal-body').innerHTML='<div class="loading"><div class="spinner"></div>読み込み中</div>';
+  document.getElementById('answer-modal').classList.add('active');
+  var data=await sbFetch('test_answers?result_id=eq.'+resultId+'&order=question_no.asc');
+  if(!Array.isArray(data)||!data.length){
+    document.getElementById('modal-body').innerHTML='<div class="empty-state">回答データがありません<br><small style="color:var(--text-muted)">※ Supabaseにtest_answersテーブルが必要です</small></div>';
+    return;
+  }
+  var correct=data.filter(function(a){return a.is_correct;}).length;
+  document.getElementById('modal-body').innerHTML=
+    '<div style="margin-bottom:1rem;padding:.75rem 1rem;background:var(--bg);border-radius:6px;display:flex;gap:2rem;font-size:13px">'
+    +'<span>正解数：<strong style="color:var(--navy)">'+correct+'問 / '+data.length+'問</strong></span>'
+    +'<span>正答率：<strong style="color:var(--navy)">'+Math.round(correct/data.length*100)+'%</strong></span>'
+    +'</div>'
+    +'<table><thead><tr><th>問</th><th>問題文</th><th>あなたの回答</th><th>正解</th><th>正誤</th><th>配点</th><th>獲得</th></tr></thead><tbody>'
+    +data.map(function(a){
+      var cls=a.is_correct?'correct-row':'wrong-row';
+      return '<tr class="'+cls+'">'
+        +'<td class="mono" style="font-weight:700;white-space:nowrap">Q'+a.question_no+'</td>'
+        +'<td style="font-size:12px;max-width:280px;line-height:1.5">'+a.question_text+'</td>'
+        +'<td style="font-size:12px;max-width:200px;color:'+(a.is_correct?'var(--green)':'var(--red)')+'">'+a.user_answer+'</td>'
+        +'<td style="font-size:12px;max-width:200px;color:var(--green)">'+a.correct_answer+'</td>'
+        +'<td style="text-align:center">'+(a.is_correct?'<span class="badge badge-green">○</span>':'<span class="badge badge-red">✗</span>')+'</td>'
+        +'<td class="mono" style="text-align:right">'+a.points+'点</td>'
+        +'<td class="mono" style="font-weight:700;text-align:right;color:'+(a.is_correct?'var(--navy)':'var(--red)')+'">'+a.earned_points+'点</td>'
+        +'</tr>';
+    }).join('')+'</tbody></table>';
+}
+function closeAnswerModal(){document.getElementById('answer-modal').classList.remove('active');}
+
+// ── 回答CSV ──
+async function exportAnswerCSV(testId){
+  var data=await sbFetch('test_answers?test_id=eq.'+testId+'&order=result_id.asc,question_no.asc');
+  if(!data||!data.length){showToast('データがありません');return;}
+  var header=['結果ID','ユーザーID','テスト','問題番号','問題文','回答','正解','正誤','配点','獲得点'];
+  var rows=data.map(function(a){
+    return [a.result_id,a.user_id,a.test_id,a.question_no,a.question_text,a.user_answer,a.correct_answer,a.is_correct?'○':'✗',a.points,a.earned_points];
+  });
+  downloadCSV([header,...rows],testId+'_answers.csv');
+  showToast('CSVをダウンロードしました（'+data.length+'件）');
 }
 
 // ── Load All ──

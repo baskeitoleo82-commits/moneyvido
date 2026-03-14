@@ -715,33 +715,50 @@ function confirmSubmit(){document.getElementById('submit-modal').classList.remov
 function submitTest(){
   if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
   var tw=document.querySelector('.timer-wrap');if(tw)tw.classList.remove('visible');
-  var aArr=[],cArr=[],pArr=[];
-  allQuestions.forEach(function(item){var key=item.sec.id+'-'+item.qi;aArr.push(answers[key]!==undefined?answers[key]:null);cArr.push(item.q.answer);pArr.push(item.points);});
+  var aArr=[],cArr=[],pArr=[],qArr=[];
+  allQuestions.forEach(function(item){
+    var key=item.sec.id+'-'+item.qi;
+    aArr.push(answers[key]!==undefined?answers[key]:null);
+    cArr.push(item.q.answer);
+    pArr.push(item.points);
+    qArr.push({no:item.q.no,text:(item.q.text||'').replace(/<[^>]*>/g,'').substring(0,250),options:item.q.options||null});
+  });
   completedTests[currentTestId]=true;
   (function(){
-    var totalPoints = aArr.reduce(function(total, a, i){
-      var c=cArr[i], pts=pArr[i], ok=false;
+    function chkOk(a,c){
       if(Array.isArray(c)){
-        if(Array.isArray(a)&&a.length===c.length){
-          var sa=a.slice().sort(function(x,y){return x-y;}),sc=c.slice().sort(function(x,y){return x-y;});
-          ok=sa.every(function(v,j){return v===sc[j];});
-        }
-      }else{ ok=(a===c); }
-      return ok?total+pts:total;
-    },0);
-    var maxPoints = pArr.reduce(function(a,b){return a+b;},0);
-    sbFetch('test_results', 'POST', {
-      user_id: currentUser.id,
-      test_id: currentTestId,
-      score: totalPoints,
-      max_score: maxPoints,
-      name: currentUser.name,
-      email: currentUser.email
+        if(!Array.isArray(a)||a.length!==c.length)return false;
+        var sa=a.slice().sort(function(x,y){return x-y;}),sc=c.slice().sort(function(x,y){return x-y;});
+        return sa.every(function(v,j){return v===sc[j];});
+      }
+      return a===c;
+    }
+    function fmtVal(v,q){
+      if(v===null||v===undefined)return '未回答';
+      if(Array.isArray(v))return v.length===0?'未回答':v.map(function(i){return q.options?(q.options[i]||'').replace(/<[^>]*>/g,''):i;}).join(' / ');
+      if(typeof v==='boolean')return v?'正しい':'間違っている';
+      if(typeof v==='number'&&q.options)return (q.options[v]||'').replace(/<[^>]*>/g,'');
+      return String(v);
+    }
+    var totalPoints=aArr.reduce(function(t,a,i){return chkOk(a,cArr[i])?t+pArr[i]:t;},0);
+    var maxPoints=pArr.reduce(function(a,b){return a+b;},0);
+    fetch(SB_URL+'/rest/v1/test_results',{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=representation'},
+      body:JSON.stringify({user_id:currentUser.id,test_id:currentTestId,score:totalPoints,max_score:maxPoints,name:currentUser.name,email:currentUser.email})
+    }).then(function(r){return r.json();}).then(function(d){
+      var rid=(Array.isArray(d)?d[0]:d).id;
+      var rows=aArr.map(function(a,i){
+        var c=cArr[i],q=qArr[i],ok=chkOk(a,c),pts=pArr[i];
+        return {result_id:rid,test_id:currentTestId,user_id:currentUser.id,
+          question_no:q.no,question_text:q.text,
+          user_answer:fmtVal(a,q),correct_answer:fmtVal(c,q),
+          is_correct:ok,points:pts,earned_points:ok?pts:0};
+      });
+      fetch(SB_URL+'/rest/v1/test_answers',{method:'POST',headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(rows)});
     }).catch(function(){});
-    (function(){
     document.getElementById('result-title').textContent=(currentTestId==='tameru'?'貯める力':'増やす力')+'  完了！';
     showScreen('result');updateTestCards();
-  })();
   })();
 }
 
