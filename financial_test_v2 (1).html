@@ -719,7 +719,16 @@ function submitTest(){
   allQuestions.forEach(function(item){var key=item.sec.id+'-'+item.qi;aArr.push(answers[key]!==undefined?answers[key]:null);cArr.push(item.q.answer);pArr.push(item.points);});
   completedTests[currentTestId]=true;
   (function(){
-    var totalPoints = pArr.reduce(function(a,b){return a+b;},0);
+    var totalPoints = aArr.reduce(function(total, a, i){
+      var c=cArr[i], pts=pArr[i], ok=false;
+      if(Array.isArray(c)){
+        if(Array.isArray(a)&&a.length===c.length){
+          var sa=a.slice().sort(function(x,y){return x-y;}),sc=c.slice().sort(function(x,y){return x-y;});
+          ok=sa.every(function(v,j){return v===sc[j];});
+        }
+      }else{ ok=(a===c); }
+      return ok?total+pts:total;
+    },0);
     var maxPoints = pArr.reduce(function(a,b){return a+b;},0);
     sbFetch('test_results', 'POST', {
       user_id: currentUser.id,
