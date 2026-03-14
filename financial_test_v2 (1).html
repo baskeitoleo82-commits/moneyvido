@@ -511,9 +511,8 @@ async function doLogin(){
     completedTests={};
     _saveSession();
     _startSessionWatch();
-    // 初回ログイン判定：パスワードが64文字の16進数でなければ初期パスワードのまま
-    var isInitialPw=!(student.password&&student.password.length===64&&/^[0-9a-f]+$/.test(student.password));
-    if(isInitialPw){showScreen('force-password');}else{goToDashboard();}
+    // 初回ログイン判定
+    if(student.must_change_password){showScreen('force-password');}else{goToDashboard();}
   } catch(err) {
     console.error('Login error:', err);
     document.getElementById('login-loading').style.display='none';
@@ -765,7 +764,7 @@ async function doForceChangePassword(){
   var ok=await fetch(SUPABASE_URL+'/rest/v1/students?student_id=eq.'+encodeURIComponent(currentUser.id),{
     method:'PATCH',
     headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
-    body:JSON.stringify({password:newHashed})
+    body:JSON.stringify({password:newHashed,must_change_password:false})
   });
   if(ok.ok){
     goToDashboard();

@@ -627,7 +627,7 @@ async function generateID(){
   }while(sbStudents.some(e=>e.student_id===studentId)&&tries<100);
 
   var hashedPw=await hashPassword(pw);
-  var ok = await sbFetch('students','POST',{student_id:studentId,name:name,email:email,password:hashedPw,active:true});
+  var ok = await sbFetch('students','POST',{student_id:studentId,name:name,email:email,password:hashedPw,active:true,must_change_password:true});
   if(ok!==false){
     _lastIssued={name:name,id:studentId,email:email,pw:pw};
     document.getElementById('ic-name').textContent=name;
