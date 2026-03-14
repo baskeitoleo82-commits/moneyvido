@@ -570,10 +570,7 @@ async function generateID(){
     studentId='MA'+num; tries++;
   }while(sbStudents.some(e=>e.student_id===studentId)&&tries<100);
 
-  var authRes = await sbAuth('signup',{email:email,password:pw,data:{name:name}});
-  var authUserId = (authRes&&authRes.user&&authRes.user.id)?authRes.user.id:'';
-
-  var ok = await sbFetch('students','POST',{student_id:studentId,name:name,email:email,password:pw,active:true,auth_user_id:authUserId});
+  var ok = await sbFetch('students','POST',{student_id:studentId,name:name,email:email,password:pw,active:true});
   if(ok!==false){
     _lastIssued={name:name,id:studentId,email:email,pw:pw};
     document.getElementById('ic-name').textContent=name;
