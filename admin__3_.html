@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>管理者ポータル | MONEY ACADEMY</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#0d2b45;--navy-mid:#1a4a6e;--navy-light:#e8f0f7;
+  --accent:#1a7fd4;--text:#111;--text-muted:#6b7280;
+  --border:#e2e8f0;--bg:#f7f9fc;--surface:#fff;
+  --green:#16a34a;--green-bg:#dcfce7;
+  --red:#dc2626;--red-bg:#fee2e2;
+  --yellow:#b45309;--yellow-bg:#fef3c7;
+  --radius:4px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.7}
+#login-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;background:var(--navy)}
+.login-box{background:#fff;border-radius:8px;padding:2.5rem 2rem;width:340px;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.login-logo{text-align:center;margin-bottom:1.75rem;font-size:18px;font-weight:700;color:var(--navy);letter-spacing:.06em}
+.login-sub{font-size:11px;color:var(--text-muted);text-align:center;margin-top:.25rem;margin-bottom:1.5rem}
+.login-field{margin-bottom:1rem}
+.login-field label{display:block;font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:.4rem;letter-spacing:.06em}
+.login-field input{width:100%;padding:.75rem 1rem;border:1.5px solid var(--border);border-radius:var(--radius);font-size:14px;font-family:inherit;outline:none;transition:border-color .15s}
+.login-field input:focus{border-color:var(--navy)}
+.login-btn{width:100%;padding:.9rem;background:var(--navy);color:#fff;border:none;border-radius:var(--radius);font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;letter-spacing:.06em;transition:background .15s;margin-top:.5rem}
+.login-btn:hover{background:var(--navy-mid)}
+.login-error{display:none;margin-top:.75rem;padding:.6rem .9rem;background:var(--red-bg);color:var(--red);border-radius:var(--radius);font-size:13px;text-align:center}
+#app{display:none;min-height:100vh}
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:220px;background:var(--navy);display:flex;flex-direction:column;z-index:100}
+.sidebar-logo{padding:1.25rem;border-bottom:1px solid rgba(255,255,255,.1)}
+.sidebar-logo-text{font-size:15px;font-weight:700;color:#fff;letter-spacing:.06em}
+.sidebar-logo-sub{font-size:11px;color:rgba(255,255,255,.45);margin-top:.2rem}
+.sidebar-section{padding:.75rem 1rem .25rem;font-size:10px;font-weight:700;letter-spacing:.14em;color:rgba(255,255,255,.4);text-transform:uppercase}
+.sidebar-nav{flex:1;padding:.5rem 0;overflow-y:auto}
+.nav-item{display:flex;align-items:center;gap:.75rem;padding:.65rem 1.25rem;cursor:pointer;color:rgba(255,255,255,.7);font-size:13.5px;font-weight:500;border-left:3px solid transparent;transition:all .15s}
+.nav-item:hover{color:#fff;background:rgba(255,255,255,.07)}
+.nav-item.active{color:#fff;background:rgba(255,255,255,.1);border-left-color:#5ab4f5}
+.nav-icon{font-size:16px;width:20px;text-align:center;flex-shrink:0}
+.sidebar-footer{padding:1rem 1.25rem;border-top:1px solid rgba(255,255,255,.1)}
+.logout-btn{width:100%;padding:.6rem;background:rgba(255,255,255,.08);color:rgba(255,255,255,.7);border:1px solid rgba(255,255,255,.15);border-radius:var(--radius);font-size:13px;font-family:inherit;cursor:pointer;transition:all .15s}
+.logout-btn:hover{background:rgba(255,255,255,.15);color:#fff}
+.main{margin-left:220px;padding:2rem;min-height:100vh}
+.page{display:none}
+.page.active{display:block}
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.75rem}
+.page-title{font-size:20px;font-weight:700;color:var(--navy)}
+.page-sub{font-size:13px;color:var(--text-muted);margin-top:.2rem}
+.stat-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-bottom:1.75rem}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1.25rem 1.5rem}
+.stat-label{font-size:11px;font-weight:700;letter-spacing:.1em;color:var(--text-muted);text-transform:uppercase;margin-bottom:.5rem}
+.stat-value{font-size:28px;font-weight:700;color:var(--navy);font-family:'DM Mono',monospace;line-height:1}
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:6px;overflow:hidden}
+.table-header{display:flex;align-items:center;justify-content:space-between;padding:1rem 1.25rem;border-bottom:1px solid var(--border)}
+.table-title{font-size:14px;font-weight:700}
+.table-actions{display:flex;gap:.6rem}
+.btn{padding:.5rem 1rem;border-radius:var(--radius);font-size:12.5px;font-weight:600;font-family:inherit;cursor:pointer;border:none;transition:all .15s;letter-spacing:.04em}
+.btn-primary{background:var(--navy);color:#fff}
+.btn-primary:hover{background:var(--navy-mid)}
+.btn-outline{background:#fff;color:var(--text);border:1px solid var(--border)}
+.btn-outline:hover{background:var(--bg)}
+.btn-red{background:var(--red);color:#fff}
+.btn-red:hover{background:#b91c1c}
+.btn-sm{padding:.35rem .75rem;font-size:12px}
+table{width:100%;border-collapse:collapse}
+thead th{padding:.65rem 1rem;text-align:left;font-size:11px;font-weight:700;letter-spacing:.08em;color:var(--text-muted);text-transform:uppercase;background:var(--bg);border-bottom:1px solid var(--border)}
+tbody td{padding:.75rem 1rem;border-bottom:1px solid var(--border);font-size:13.5px;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--bg)}
+.badge{display:inline-block;padding:.2rem .6rem;border-radius:99px;font-size:11px;font-weight:700}
+.badge-green{background:var(--green-bg);color:var(--green)}
+.badge-red{background:var(--red-bg);color:var(--red)}
+.badge-yellow{background:var(--yellow-bg);color:var(--yellow)}
+.badge-gray{background:#f1f5f9;color:#64748b}
+.badge-navy{background:var(--navy-light);color:var(--navy)}
+.score-bar-wrap{display:flex;align-items:center;gap:.6rem;min-width:120px}
+.score-bar-track{flex:1;height:6px;background:var(--border);border-radius:99px;overflow:hidden}
+.score-bar-fill{height:100%;border-radius:99px;background:var(--navy);transition:width .3s}
+.score-text{font-size:12px;font-family:'DM Mono',monospace;color:var(--text-muted);white-space:nowrap}
+.form-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1rem;margin-bottom:1rem}
+.form-box{background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:1.5rem;margin-bottom:1.25rem}
+.form-box-title{font-size:14px;font-weight:700;color:var(--navy);margin-bottom:1rem}
+.field{margin-bottom:.85rem}
+.field label{display:block;font-size:12px;font-weight:700;color:var(--text-muted);margin-bottom:.35rem;letter-spacing:.06em}
+.field input,.field textarea,.field select{width:100%;padding:.65rem .9rem;border:1.5px solid var(--border);border-radius:var(--radius);font-size:14px;font-family:inherit;outline:none;background:#fff;transition:border-color .15s;resize:vertical}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--navy)}
+.loading{text-align:center;padding:3rem;color:var(--text-muted);font-size:14px}
+.spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 1rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty-state{text-align:center;padding:3rem;color:var(--text-muted);font-size:14px}
+.empty-icon{font-size:36px;margin-bottom:.75rem}
+#toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--navy);color:#fff;padding:.75rem 1.25rem;border-radius:var(--radius);font-size:13.5px;font-weight:600;transform:translateY(80px);opacity:0;transition:all .3s;z-index:999}
+#toast.show{transform:translateY(0);opacity:1}
+.search-bar{display:flex;gap:.75rem;margin-bottom:1.25rem;align-items:center;flex-wrap:wrap}
+.search-input{flex:1;max-width:300px;padding:.6rem 1rem;border:1.5px solid var(--border);border-radius:var(--radius);font-size:14px;font-family:inherit;outline:none;background:#fff;transition:border-color .15s}
+.search-input:focus{border-color:var(--navy)}
+.filter-select{padding:.6rem .9rem;border:1.5px solid var(--border);border-radius:var(--radius);font-size:14px;font-family:inherit;outline:none;background:#fff;cursor:pointer}
+.mono{font-family:'DM Mono',monospace;font-size:12px}
+.notice-form{display:grid;grid-template-columns:1fr 2fr auto;gap:.75rem;align-items:end}
+@media(max-width:900px){.notice-form{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<div id="login-screen">
+  <div class="login-box">
+    <div class="login-logo">MONEY ACADEMY<div class="login-sub">管理者ポータル</div></div>
+    <div class="login-field"><label>管理者パスワード</label><input type="password" id="login-pw" placeholder="パスワードを入力" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <button class="login-btn" onclick="doLogin()">ログイン</button>
+    <div class="login-error" id="login-error">パスワードが正しくありません</div>
+  </div>
+</div>
+
+<div id="app">
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-text">MONEY ACADEMY</div>
+      <div class="sidebar-logo-sub">Admin Portal</div>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="sidebar-section">メニュー</div>
+      <div class="nav-item active" onclick="showPage('dashboard',this)"><span class="nav-icon">›</span>ダッシュボード</div>
+      <div class="nav-item" onclick="showPage('students',this)"><span class="nav-icon">›</span>受講生一覧</div>
+      <div class="nav-item" onclick="showPage('ids',this)"><span class="nav-icon">›</span>受講生ID管理</div>
+      <div class="nav-item" onclick="showPage('notices',this)"><span class="nav-icon">›</span>お知らせ管理</div>
+      <div class="nav-item" onclick="showPage('lectures',this)"><span class="nav-icon">›</span>講義管理</div>
+      <div class="nav-item" onclick="showPage('export',this)"><span class="nav-icon">›</span>CSVエクスポート</div>
+    </nav>
+    <div class="sidebar-footer"><button class="logout-btn" onclick="doLogout()">ログアウト</button></div>
+  </aside>
+
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header">
+        <div><div class="page-title">ダッシュボード</div><div class="page-sub" id="last-updated">読み込み中…</div></div>
+        <button class="btn btn-outline" onclick="loadAll()">更新</button>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-card"><div class="stat-label">総受講生数</div><div class="stat-value" id="stat-total">—</div></div>
+        <div class="stat-card"><div class="stat-label">貯める力 完了</div><div class="stat-value" id="stat-tameru">—</div></div>
+        <div class="stat-card"><div class="stat-label">増やす力 完了</div><div class="stat-value" id="stat-fuyasu">—</div></div>
+        <div class="stat-card"><div class="stat-label">両テスト完了</div><div class="stat-value" id="stat-both">—</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem">
+        <div class="table-wrap"><div class="table-header"><div class="table-title">貯める力　上位5名</div></div><div id="dash-tameru"></div></div>
+        <div class="table-wrap"><div class="table-header"><div class="table-title">増やす力　上位5名</div></div><div id="dash-fuyasu"></div></div>
+      </div>
+    </div>
+
+    <!-- STUDENTS -->
+    <div class="page" id="page-students">
+      <div class="page-header"><div><div class="page-title">受講生一覧</div><div class="page-sub">受講生ごとのテスト受験状況と成績</div></div></div>
+      <div class="search-bar">
+        <input class="search-input" id="student-q" placeholder="名前・ID・メールで検索…" oninput="renderStudents()">
+        <select class="filter-select" id="student-f" onchange="renderStudents()">
+          <option value="all">すべて</option>
+          <option value="both">両テスト完了</option>
+          <option value="tameru">貯める力のみ</option>
+          <option value="fuyasu">増やす力のみ</option>
+          <option value="none">未受験</option>
+        </select>
+      </div>
+      <div class="table-wrap"><div id="students-table"><div class="loading"><div class="spinner"></div>読み込み中</div></div></div>
+    </div>
+
+    <!-- ID管理 -->
+    <div class="page" id="page-ids">
+      <div class="page-header"><div><div class="page-title">受講生ID管理</div><div class="page-sub">受講生IDの発行・管理</div></div></div>
+      <div class="form-box">
+        <div class="form-box-title">新規ID発行</div>
+        <div class="form-grid">
+          <div class="field"><label>氏名</label><input type="text" id="new-name" placeholder="山田 太郎"></div>
+          <div class="field"><label>メールアドレス</label><input type="email" id="new-email" placeholder="taro@example.com"></div>
+          <div class="field"><label>パスワード</label><input type="text" id="new-pw" placeholder="例：pass1234"></div>
+          <div class="field"><label>ID接頭辞</label><input type="text" id="new-prefix" value="MA" maxlength="4"></div>
+        </div>
+        <button class="btn btn-primary" onclick="generateID()">+ ID発行</button>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <div class="table-title">発行済みID一覧</div>
+          <div class="table-actions"><button class="btn btn-outline btn-sm" onclick="exportIDs()">CSV出力</button></div>
+        </div>
+        <div id="ids-table"><div class="loading"><div class="spinner"></div>読み込み中</div></div>
+      </div>
+    </div>
+
+    <!-- お知らせ管理 -->
+    <div class="page" id="page-notices">
+      <div class="page-header"><div><div class="page-title">お知らせ管理</div><div class="page-sub">受講生ダッシュボードに表示されるお知らせ</div></div></div>
+      <div class="form-box">
+        <div class="form-box-title">新規お知らせ投稿</div>
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:1rem;margin-bottom:.75rem">
+          <div class="field"><label>タイトル</label><input type="text" id="notice-title" placeholder="例：テスト開催のお知らせ"></div>
+          <div class="field"><label>本文</label><textarea id="notice-body" rows="3" placeholder="お知らせの内容を入力してください"></textarea></div>
+        </div>
+        <button class="btn btn-primary" onclick="postNotice()">投稿する</button>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header"><div class="table-title">投稿済みお知らせ</div><button class="btn btn-outline btn-sm" onclick="loadNotices()">更新</button></div>
+        <div id="notices-table"><div class="loading"><div class="spinner"></div>読み込み中</div></div>
+      </div>
+    </div>
+
+    <!-- LECTURES -->
+    <div class="page" id="page-lectures">
+      <div class="page-header">
+        <div><div class="page-title">講義管理</div><div class="page-sub">受講生に表示する講義リストの登録・編集</div></div>
+      </div>
+      <div class="form-box">
+        <div class="form-box-title">講義を追加</div>
+        <div style="display:grid;grid-template-columns:2fr 3fr auto;gap:.75rem;align-items:end;">
+          <div class="field"><label>講義タイトル</label><input type="text" id="lec-title" placeholder="例：第1講　お金の基本"></div>
+          <div class="field"><label>動画URL（任意）</label><input type="text" id="lec-url" placeholder="例：https://youtu.be/xxxx"></div>
+          <div><button class="btn btn-primary" onclick="addLecture()" style="margin-bottom:.85rem;">+ 追加</button></div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <div class="table-header">
+          <div class="table-title">講義一覧</div>
+          <button class="btn btn-outline btn-sm" onclick="loadLectureAdmin()">更新</button>
+        </div>
+        <div id="lectures-table"><div class="loading"><div class="spinner"></div>読み込み中</div></div>
+      </div>
+    </div>
+
+    <!-- CSV EXPORT -->
+    <div class="page" id="page-export">
+      <div class="page-header"><div><div class="page-title">CSVエクスポート</div><div class="page-sub">テスト結果をCSVでダウンロード</div></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;margin-bottom:1.25rem">
+        <div class="table-wrap" style="padding:1.75rem">
+          <div style="font-size:16px;font-weight:700;margin-bottom:.5rem">貯める力　回答データ</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:1.25rem">全受講生の回答・正誤・得点データ</div>
+          <button class="btn btn-primary" style="width:100%" onclick="exportCSV('tameru')">CSVダウンロード</button>
+        </div>
+        <div class="table-wrap" style="padding:1.75rem">
+          <div style="font-size:16px;font-weight:700;margin-bottom:.5rem">増やす力　回答データ</div>
+          <div style="font-size:13px;color:var(--text-muted);margin-bottom:1.25rem">全受講生の回答・正誤・得点データ</div>
+          <button class="btn btn-primary" style="width:100%" onclick="exportCSV('fuyasu')">CSVダウンロード</button>
+        </div>
+      </div>
+      <div class="table-wrap" style="padding:1.75rem">
+        <div style="font-size:16px;font-weight:700;margin-bottom:.5rem">受講生IDリスト</div>
+        <div style="font-size:13px;color:var(--text-muted);margin-bottom:1.25rem">発行済み受講生ID・パスワード一覧</div>
+        <button class="btn btn-outline" onclick="exportIDs()">IDリストCSVダウンロード</button>
+      </div>
+    </div>
+
+  </main>
+</div>
+<div id="toast"></div>
+
+<script>
+const ADMIN_PASSWORD = 'moneyacademy2024'; // ← 変更してください
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbx3kZhpUzjY22rH59LhyIFBPzTKBLDtex-Jsm2h71cwkM1lYtW1STcTPVEESaDm9Bp4/exec';
+
+let tameruData=[], fuyasuData=[], idList=JSON.parse(localStorage.getItem('ma_ids_v2')||'[]'), noticesData=[];
+
+// ── Login ──
+function doLogin(){
+  if(document.getElementById('login-pw').value===ADMIN_PASSWORD){
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+    loadAll();
+  }else{
+    document.getElementById('login-error').style.display='block';
+  }
+}
+function doLogout(){
+  document.getElementById('app').style.display='none';
+  document.getElementById('login-screen').style.display='flex';
+  document.getElementById('login-pw').value='';
+}
+document.getElementById('login-pw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
+
+// ── Page ──
+function showPage(id, el){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  if(el) el.classList.add('active');
+  if(id==='students') renderStudents();
+  if(id==='ids') renderIDs();
+  if(id==='notices') loadNotices();
+  if(id==='lectures') loadLectureAdmin();
+}
+
+// ── GAS通信 ──
+function gasGet(params, cb){
+  const cbName='gas_'+Date.now();
+  params.callback=cbName;
+  const url=GAS_URL+'?'+Object.entries(params).map(([k,v])=>k+'='+encodeURIComponent(v)).join('&');
+  window[cbName]=res=>{cb(res);delete window[cbName];};
+  const s=document.createElement('script');
+  s.src=url; s.onerror=()=>cb({status:'error'});
+  document.head.appendChild(s);
+  setTimeout(()=>{if(window[cbName]){cb({status:'timeout'});delete window[cbName];}},10000);
+}
+
+// ── Load All ──
+function loadAll(){
+  document.getElementById('last-updated').textContent='読み込み中…';
+  let done=0;
+  const check=()=>{if(++done===2)renderDashboard();};
+  gasGet({action:'getSheet',testId:'tameru'},res=>{tameruData=res.rows||[];check();});
+  gasGet({action:'getSheet',testId:'fuyasu'},res=>{fuyasuData=res.rows||[];check();});
+  document.getElementById('last-updated').textContent='最終更新：'+new Date().toLocaleString('ja-JP');
+}
+
+// ── Dashboard ──
+function renderDashboard(){
+  const tIds=new Set(tameruData.map(r=>r[3]));
+  const fIds=new Set(fuyasuData.map(r=>r[3]));
+  const allIds=new Set([...tIds,...fIds,...idList.map(i=>i.id)]);
+  document.getElementById('stat-total').textContent=allIds.size;
+  document.getElementById('stat-tameru').textContent=tIds.size;
+  document.getElementById('stat-fuyasu').textContent=fIds.size;
+  document.getElementById('stat-both').textContent=[...tIds].filter(id=>fIds.has(id)).length;
+  renderDashTable('dash-tameru',tameruData);
+  renderDashTable('dash-fuyasu',fuyasuData);
+}
+
+function renderDashTable(elId, rows){
+  const el=document.getElementById(elId);
+  if(!rows.length){el.innerHTML='<div class="empty-state"><div class="empty-icon"></div>データなし</div>';return;}
+  const scores=rows.map(r=>parseFloat(r[5])||0);
+  const avg=Math.round(scores.reduce((a,b)=>a+b,0)/scores.length);
+  const top5=rows.map((r,i)=>({name:r[1],score:scores[i],max:parseFloat(r[6])||100}))
+    .sort((a,b)=>b.score-a.score).slice(0,5);
+  el.innerHTML=`<div style="padding:.75rem 1rem;background:var(--bg);border-bottom:1px solid var(--border);font-size:13px;display:flex;gap:1.5rem">
+    <span>平均：<strong style="color:var(--navy)">${avg}点</strong></span>
+    <span>受験者：<strong>${rows.length}名</strong></span>
+    </div>
+    <table><thead><tr><th>順位</th><th>名前</th><th>得点</th></tr></thead><tbody>
+    ${top5.map((r,i)=>`<tr><td style="font-weight:700">${['1位','2位','3位'][i]||i+1+'位'}</td>
+    <td>${r.name}</td>
+    <td><span style="font-weight:700;font-family:'DM Mono',monospace">${r.score}</span>
+    <span style="color:var(--text-muted);font-size:12px"> / ${r.max}</span></td></tr>`).join('')}
+    </tbody></table>`;
+}
+
+// ── Students ──
+function buildStudentMap(){
+  const map={};
+  [...idList].forEach(e=>{
+    map[e.id]={name:e.name,email:e.email,sid:e.id,tameru:null,fuyasu:null};
+  });
+  tameruData.forEach(r=>{
+    const sid=r[3];
+    if(!map[sid]) map[sid]={name:r[1],email:r[2],sid,tameru:null,fuyasu:null};
+    const s=parseFloat(r[5])||0,m=parseFloat(r[6])||100;
+    if(!map[sid].tameru||s>map[sid].tameru.score) map[sid].tameru={score:s,max:m,date:r[0]};
+  });
+  fuyasuData.forEach(r=>{
+    const sid=r[3];
+    if(!map[sid]) map[sid]={name:r[1],email:r[2],sid,tameru:null,fuyasu:null};
+    const s=parseFloat(r[5])||0,m=parseFloat(r[6])||100;
+    if(!map[sid].fuyasu||s>map[sid].fuyasu.score) map[sid].fuyasu={score:s,max:m,date:r[0]};
+  });
+  return map;
+}
+
+function renderStudents(){
+  const map=buildStudentMap();
+  const q=(document.getElementById('student-q').value||'').toLowerCase();
+  const f=document.getElementById('student-f').value;
+  const el=document.getElementById('students-table');
+  let students=Object.values(map).filter(s=>{
+    const mq=!q||s.name.toLowerCase().includes(q)||s.email.toLowerCase().includes(q)||s.sid.toLowerCase().includes(q);
+    const ht=!!s.tameru,hf=!!s.fuyasu;
+    const mf=f==='all'?true:f==='both'?ht&&hf:f==='tameru'?ht&&!hf:f==='fuyasu'?!ht&&hf:!ht&&!hf;
+    return mq&&mf;
+  });
+  if(!students.length){el.innerHTML='<div class="empty-state"><div class="empty-icon"></div>該当なし</div>';return;}
+  const sc=d=>{
+    if(!d) return '<span class="badge badge-gray">未受験</span>';
+    const p=Math.round(d.score/d.max*100);
+    const cls=p>=75?'badge-green':p>=60?'badge-yellow':'badge-red';
+    return `<span class="badge ${cls}">${d.score}/${d.max}</span>
+      <div class="score-bar-wrap" style="margin-top:.25rem">
+        <div class="score-bar-track"><div class="score-bar-fill" style="width:${p}%"></div></div>
+        <div class="score-text">${p}%</div></div>`;
+  };
+  el.innerHTML=`<table><thead><tr><th>受講生ID</th><th>氏名</th><th>メール</th><th>貯める力</th><th>増やす力</th><th>状況</th></tr></thead>
+  <tbody>${students.map(s=>{
+    const b=s.tameru&&s.fuyasu,n=!s.tameru&&!s.fuyasu;
+    return `<tr><td class="mono"><strong>${s.sid}</strong></td><td>${s.name}</td>
+    <td style="color:var(--text-muted)">${s.email||'—'}</td>
+    <td>${sc(s.tameru)}</td><td>${sc(s.fuyasu)}</td>
+    <td>${b?'<span class="badge badge-green">両方完了</span>':n?'<span class="badge badge-gray">未受験</span>':'<span class="badge badge-yellow">受験中</span>'}</td></tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+// ── ID管理 ──
+function generateID(){
+  var name   = document.getElementById('new-name').value.trim();
+  var email  = document.getElementById('new-email').value.trim();
+  var pw     = document.getElementById('new-pw').value.trim();
+  var prefix = document.getElementById('new-prefix').value.trim();
+  if(!prefix) prefix = 'MA';
+  if(!name || !pw){ showToast('氏名とパスワードを入力してください'); return; }
+
+  // 重複しないランダム4桁
+  var num, id, tries = 0;
+  do {
+    num = String(Math.floor(Math.random() * 9000) + 1000);
+    id  = prefix + '-' + num;
+    tries++;
+  } while(idList.some(function(e){ return e.id === id; }) && tries < 100);
+
+  var entry = {
+    id:        id,
+    name:      name,
+    email:     email,
+    password:  pw,
+    createdAt: new Date().toLocaleString('ja-JP'),
+    active:    true
+  };
+  idList.push(entry);
+  localStorage.setItem('ma_ids_v2', JSON.stringify(idList));
+
+  gasGet({action:'addStudent', id:id, name:name, email:email, password:pw}, function(res){
+    if(res.status === 'ok') showToast('ID発行しました：' + id);
+    else showToast('ID発行しました（GAS記録エラー）：' + id);
+  });
+
+  document.getElementById('new-name').value  = '';
+  document.getElementById('new-email').value = '';
+  document.getElementById('new-pw').value    = '';
+  renderIDs();
+}
+
+function toggleIDActive(idx){
+  idList[idx].active=!idList[idx].active;
+  localStorage.setItem('ma_ids_v2',JSON.stringify(idList));
+  renderIDs();
+}
+
+function deleteID(idx){
+  if(!confirm('「' + idList[idx].name + '」（' + idList[idx].id + '）を削除しますか？\nこの操作は元に戻せません。'))return;
+  idList.splice(idx,1);
+  localStorage.setItem('ma_ids_v2',JSON.stringify(idList));
+  showToast('削除しました');
+  renderIDs();
+}
+
+function renderIDs(){
+  const el=document.getElementById('ids-table');
+  if(!idList.length){el.innerHTML='<div class="empty-state"><div class="empty-icon"></div>まだIDが発行されていません</div>';return;}
+  const map=buildStudentMap();
+  el.innerHTML=`<table><thead><tr><th>受講生ID</th><th>氏名</th><th>メール</th><th>パスワード</th><th>発行日時</th><th>テスト状況</th><th>状態</th><th></th></tr></thead>
+  <tbody>${idList.map((e,i)=>{
+    const s=map[e.id];
+    const ht=s&&s.tameru,hf=s&&s.fuyasu;
+    const status=ht&&hf?'<span class="badge badge-green">両方完了</span>':ht?'<span class="badge badge-yellow">貯める完了</span>':hf?'<span class="badge badge-yellow">増やす完了</span>':'<span class="badge badge-gray">未受験</span>';
+    return `<tr>
+      <td class="mono"><strong>${e.id}</strong></td>
+      <td>${e.name}</td>
+      <td style="color:var(--text-muted)">${e.email||'—'}</td>
+      <td class="mono">${e.password||'—'}</td>
+      <td style="color:var(--text-muted);font-size:12px">${e.createdAt}</td>
+      <td>${status}</td>
+      <td>${e.active?'<span class="badge badge-green">有効</span>':'<span class="badge badge-red">無効</span>'}</td>
+      <td style="display:flex;gap:.4rem;">
+        <button class="btn btn-outline btn-sm" onclick="toggleIDActive(${i})">${e.active?'無効化':'有効化'}</button>
+        <button class="btn btn-red btn-sm" onclick="deleteID(${i})">削除</button>
+      </td>
+    </tr>`;
+  }).join('')}</tbody></table>`;
+}
+
+function exportIDs(){
+  if(!idList.length){showToast('IDがありません');return;}
+  const rows=[['受講生ID','氏名','メールアドレス','パスワード','発行日時','状態'],
+    ...idList.map(e=>[e.id,e.name,e.email||'',e.password||'',e.createdAt,e.active?'有効':'無効'])];
+  downloadCSV(rows,'ma_id_list.csv');
+  showToast('IDリストをダウンロードしました');
+}
+
+// ── お知らせ ──
+function loadNotices(){
+  gasGet({action:'getNotices'},res=>{
+    noticesData=res.notices||[];
+    renderNotices();
+  });
+}
+
+function postNotice(){
+  const title=document.getElementById('notice-title').value.trim();
+  const body=document.getElementById('notice-body').value.trim();
+  if(!title){showToast('タイトルを入力してください');return;}
+  gasGet({action:'addNotice',title,body},res=>{
+    if(res.status==='ok'){
+      showToast('お知らせを投稿しました');
+      document.getElementById('notice-title').value='';
+      document.getElementById('notice-body').value='';
+      loadNotices();
+    }else{
+      showToast('投稿に失敗しました');
+    }
+  });
+}
+
+function deleteNotice(row){
+  if(!confirm('このお知らせを削除しますか？'))return;
+  gasGet({action:'deleteNotice',row},res=>{
+    if(res.status==='ok'){showToast('削除しました');loadNotices();}
+  });
+}
+
+function renderNotices(){
+  const el=document.getElementById('notices-table');
+  if(!noticesData.length){el.innerHTML='<div class="empty-state"><div class="empty-icon"></div>お知らせはありません</div>';return;}
+  el.innerHTML=`<table><thead><tr><th>日付</th><th>タイトル</th><th>本文</th><th></th></tr></thead>
+  <tbody>${noticesData.map(n=>`<tr>
+    <td style="white-space:nowrap;color:var(--text-muted);font-size:12px">${n.date}${n.isNew?'<span class="badge badge-navy" style="margin-left:.4rem">NEW</span>':''}</td>
+    <td><strong>${n.title}</strong></td>
+    <td style="color:var(--text-muted)">${n.body||'—'}</td>
+    <td><button class="btn btn-red btn-sm" onclick="deleteNotice(${n.row})">削除</button></td>
+  </tr>`).join('')}</tbody></table>`;
+}
+
+// ── CSV ──
+function exportCSV(testId){
+  const data=testId==='tameru'?tameruData:fuyasuData;
+  if(!data.length){showToast('データがありません');return;}
+  const numQ=Math.floor((data[0].length-7)/3);
+  const header=['送信日時','名前','メールアドレス','受講生ID','テスト名','合計点','満点'];
+  for(let i=1;i<=numQ;i++) header.push('問'+i+'_回答','問'+i+'_正誤','問'+i+'_得点');
+  downloadCSV([header,...data], (testId==='tameru'?'tameru':'fuyasu')+'_results.csv');
+  showToast('CSVをダウンロードしました（'+data.length+'件）');
+}
+
+function downloadCSV(rows,filename){
+  const bom='\uFEFF';
+  const csv=bom+rows.map(r=>r.map(c=>'"'+String(c??'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download=filename; a.click();
+}
+
+// ── Toast ──
+let toastTimer;
+function showToast(msg){
+  const el=document.getElementById('toast');
+  el.textContent=msg; el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>el.classList.remove('show'),3000);
+}
+
+// ============================================================
+// 講義管理
+// ============================================================
+let lectureData = [];
+
+function loadLectureAdmin() {
+  gasGet({action:'getLectures'}, function(res) {
+    lectureData = (res && res.lectures) ? res.lectures : [];
+    renderLectures();
+  });
+}
+
+function renderLectures() {
+  var el = document.getElementById('lectures-table');
+  if (!lectureData.length) {
+    el.innerHTML = '<div class="empty-state"><div class="empty-icon" style="font-size:36px;margin-bottom:.75rem;">—</div>まだ講義がありません</div>';
+    return;
+  }
+  el.innerHTML = '<table><thead><tr><th>#</th><th>タイトル</th><th>URL</th><th></th></tr></thead><tbody>'
+    + lectureData.map(function(l, i) {
+      return '<tr>'
+        + '<td style="color:var(--text-muted);font-family:'DM Mono',monospace;font-size:12px;">' + String(i+1).padStart(2,'0') + '</td>'
+        + '<td><strong>' + l.title + '</strong></td>'
+        + '<td style="color:var(--text-muted);font-size:12px;">' + (l.url ? '<a href="' + l.url + '" target="_blank" style="color:var(--accent);">' + l.url.substring(0,40) + '…</a>' : '—') + '</td>'
+        + '<td style="display:flex;gap:.4rem;">'
+        + '<button class="btn btn-outline btn-sm" onclick="editLecture('' + l.id + '','' + l.title.replace(/'/g,"\'") + '','' + (l.url||'').replace(/'/g,"\'") + '')">編集</button>'
+        + '<button class="btn btn-red btn-sm" onclick="deleteLecture('' + l.id + '')">削除</button>'
+        + '</td>'
+        + '</tr>';
+    }).join('') + '</tbody></table>';
+}
+
+function addLecture() {
+  var title = document.getElementById('lec-title').value.trim();
+  var url   = document.getElementById('lec-url').value.trim();
+  if (!title) { showToast('タイトルを入力してください'); return; }
+  gasGet({action:'addLecture', title:title, url:url}, function(res) {
+    if (res.status === 'ok') {
+      showToast('追加しました：' + title);
+      document.getElementById('lec-title').value = '';
+      document.getElementById('lec-url').value   = '';
+      loadLectureAdmin();
+    } else {
+      showToast('追加に失敗しました');
+    }
+  });
+}
+
+function deleteLecture(id) {
+  if (!confirm('この講義を削除しますか？')) return;
+  gasGet({action:'deleteLecture', id:id}, function(res) {
+    if (res.status === 'ok') { showToast('削除しました'); loadLectureAdmin(); }
+  });
+}
+
+function editLecture(id, currentTitle, currentUrl) {
+  var newTitle = prompt('講義タイトルを編集', currentTitle);
+  if (newTitle === null) return;
+  var newUrl = prompt('動画URLを編集（なければ空白）', currentUrl);
+  if (newUrl === null) return;
+  gasGet({action:'editLecture', id:id, title:newTitle.trim(), url:(newUrl||'').trim()}, function(res) {
+    if (res.status === 'ok') { showToast('更新しました'); loadLectureAdmin(); }
+  });
+}
+
+// 初期化
+renderIDs();
+</script>
+</body>
+</html>
