@@ -287,6 +287,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           お知らせ
         </div>
+      <div class="lms-nav-item" onclick="lmsTab('dm',this)" id="nav-dm">DM<span id="dm-badge" style="display:none;background:var(--red);color:#fff;border-radius:99px;font-size:10px;font-weight:700;padding:.1rem .45rem;margin-left:.4rem">0</span></div>
       </nav>
       <div class="lms-user-wrap">
         <div class="lms-user-avatar"></div>
@@ -337,6 +338,11 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--bg);color:var(--text
       <div class="lms-tab-panel" id="lms-tab-lectures">
         <div class="lms-page-title">講義</div>
         <div id="lecture-list-wrap" style="margin-top:1.5rem;"><div class="notice-empty">読み込み中...</div></div>
+      </div>
+      <!-- DMタブ -->
+      <div class="lms-tab-panel" id="lms-tab-dm">
+        <div class="lms-page-title">DM</div>
+        <div id="dm-inbox" style="margin-top:1.5rem"><div class="notice-empty">読み込み中...</div></div>
       </div>
       <!-- お知らせタブ -->
       <div class="lms-tab-panel" id="lms-tab-notices">
@@ -485,6 +491,7 @@ function goToDashboard(){
     loadLectures();
     try{loadNoticesDash();}catch(e){}
     try{loadNotices();}catch(e){}
+    try{loadMessages();}catch(e){}
     showScreen('dashboard');
     lmsTab('dashboard', document.querySelector('.lms-nav-item'));
   }catch(e){
@@ -501,6 +508,7 @@ function lmsTab(tabId, el) {
   if(el) el.classList.add('active');
   if(tabId === 'lectures') loadLectures();
   if(tabId === 'notices') loadNotices();
+  if(tabId === 'dm') loadMessages();
 }
 
 function loadNoticesDash(){
@@ -654,6 +662,43 @@ function loadLectures(){
   });
   wrap.innerHTML = html;
 }
+// ── DM（受信箱） ──
+async function loadMessages(){
+  if(!currentUser)return;
+  var el=document.getElementById('dm-inbox');
+  if(!el)return;
+  el.innerHTML='<div class="notice-empty">読み込み中...</div>';
+  var data=await fetch(SUPABASE_URL+'/rest/v1/messages?to_student_id=eq.'+encodeURIComponent(currentUser.id)+'&order=created_at.desc',{
+    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+  }).then(function(r){return r.json();}).catch(function(){return [];});
+  if(!Array.isArray(data)||!data.length){
+    el.innerHTML='<div class="notice-empty">メッセージはありません</div>';
+    document.getElementById('dm-badge').style.display='none';
+    return;
+  }
+  var unread=data.filter(function(m){return !m.is_read;}).length;
+  var badge=document.getElementById('dm-badge');
+  if(unread>0){badge.textContent=unread;badge.style.display='';}else{badge.style.display='none';}
+  el.innerHTML=data.map(function(m){
+    var dt=new Date(m.created_at).toLocaleString('ja-JP');
+    var unreadStyle=m.is_read?'':'background:#eff6ff;border-color:#3b82f6;';
+    return '<div class="notice-card" style="margin-bottom:.75rem;padding:1rem 1.25rem;'+unreadStyle+'" onclick="markRead('+m.id+')">'
+      +(m.is_read?'':'<span style="font-size:11px;font-weight:700;color:#3b82f6;margin-bottom:.25rem;display:block">● 未読</span>')
+      +'<div style="font-size:13.5px;line-height:1.7;white-space:pre-wrap">'+m.body.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</div>'
+      +'<div style="font-size:11px;color:var(--text-muted);margin-top:.5rem">'+dt+'</div>'
+      +'</div>';
+  }).join('');
+  // 未読を既読にする
+  data.filter(function(m){return !m.is_read;}).forEach(function(m){
+    fetch(SUPABASE_URL+'/rest/v1/messages?id=eq.'+m.id,{
+      method:'PATCH',
+      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,'Content-Type':'application/json','Prefer':'return=minimal'},
+      body:JSON.stringify({is_read:true})
+    }).catch(function(){});
+  });
+}
+function markRead(id){/* タップ時の既読処理は loadMessages内で一括処理済み */}
+
 function toggleLecture(lid){var pkey='lecture_progress_'+currentUser.id;var prog=JSON.parse(localStorage.getItem(pkey)||'{}');prog[lid]=!prog[lid];localStorage.setItem(pkey,JSON.stringify(prog));loadLectures();}
 
 function goToIntro(testId){

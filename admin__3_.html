@@ -109,6 +109,12 @@ tbody tr:hover td{background:var(--bg)}
 .modal-body{padding:1.25rem;overflow-x:auto}
 .correct-row td{background:#f0fdf4}
 .wrong-row td{background:#fef2f2}
+.dm-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:300;display:none;align-items:flex-start;justify-content:center;padding:2rem 1rem;overflow-y:auto}
+.dm-modal-overlay.active{display:flex}
+.dm-modal-box{background:#fff;border-radius:8px;width:100%;max-width:640px;display:flex;flex-direction:column;overflow:hidden;margin:auto}
+.dm-msg-admin{background:var(--navy);color:#fff;border-radius:8px;padding:.75rem 1rem;margin-bottom:.75rem;font-size:13.5px;line-height:1.6}
+.dm-msg-admin .dm-meta{font-size:11px;opacity:.65;margin-top:.4rem}
+.dm-unread-dot{display:inline-block;width:8px;height:8px;background:var(--red);border-radius:50%;margin-left:.4rem;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -139,6 +145,9 @@ tbody tr:hover td{background:var(--bg)}
       <div class="sidebar-section">テスト結果</div>
       <div class="nav-item" onclick="showPage('tameru',this)"><span class="nav-icon">›</span>貯める力　結果</div>
       <div class="nav-item" onclick="showPage('fuyasu',this)"><span class="nav-icon">›</span>増やす力　結果</div>
+      <div class="sidebar-section">受講生管理</div>
+      <div class="nav-item" onclick="showPage('progress',this)"><span class="nav-icon">›</span>受講生進捗</div>
+      <div class="nav-item" onclick="showPage('dm',this)"><span class="nav-icon">›</span>DM送信</div>
     </nav>
     <div class="sidebar-footer"><button class="logout-btn" onclick="doLogout()">ログアウト</button></div>
   </aside>
@@ -304,6 +313,24 @@ tbody tr:hover td{background:var(--bg)}
       <div class="table-wrap"><div id="fuyasu-results-table"><div class="loading"><div class="spinner"></div>読み込み中</div></div></div>
     </div>
 
+    <!-- 受講生進捗 -->
+    <div class="page" id="page-progress">
+      <div class="page-header">
+        <div><div class="page-title">受講生進捗</div><div class="page-sub">各受講生のテスト・講義の進捗状況</div></div>
+        <button class="btn btn-outline" onclick="loadProgress()">更新</button>
+      </div>
+      <div class="table-wrap"><div id="progress-table"><div class="loading"><div class="spinner"></div>読み込み中</div></div></div>
+    </div>
+
+    <!-- DM送信 -->
+    <div class="page" id="page-dm">
+      <div class="page-header">
+        <div><div class="page-title">DM送信</div><div class="page-sub">受講生への個別メッセージ</div></div>
+        <button class="btn btn-outline" onclick="loadDMPage()">更新</button>
+      </div>
+      <div class="table-wrap"><div id="dm-student-list"><div class="loading"><div class="spinner"></div>読み込み中</div></div></div>
+    </div>
+
   </main>
 </div>
 
@@ -346,16 +373,38 @@ async function sbAuth(path, body){
 }
 
 // ── Login ──
+var ADMIN_SESSION_KEY='ma_admin_session';
+var ADMIN_TIMEOUT=2*60*60*1000;
+var _adminActivityTimer=null;
+
+function _saveAdminSession(){localStorage.setItem(ADMIN_SESSION_KEY,JSON.stringify({lastActivity:Date.now()}));}
+function _clearAdminSession(){localStorage.removeItem(ADMIN_SESSION_KEY);}
+function _touchAdminActivity(){var raw=localStorage.getItem(ADMIN_SESSION_KEY);if(!raw)return;var s=JSON.parse(raw);s.lastActivity=Date.now();localStorage.setItem(ADMIN_SESSION_KEY,JSON.stringify(s));}
+function _startAdminSessionWatch(){
+  if(_adminActivityTimer)clearInterval(_adminActivityTimer);
+  _adminActivityTimer=setInterval(function(){
+    var raw=localStorage.getItem(ADMIN_SESSION_KEY);
+    if(!raw){doLogout();return;}
+    var s=JSON.parse(raw);
+    if(Date.now()-s.lastActivity>ADMIN_TIMEOUT){doLogout();showToast('セッションが期限切れです');}
+  },60000);
+}
+['click','keydown','touchstart'].forEach(function(t){document.addEventListener(t,_touchAdminActivity,true);});
+
 function doLogin(){
   if(document.getElementById('login-pw').value===ADMIN_PASSWORD){
     document.getElementById('login-screen').style.display='none';
     document.getElementById('app').style.display='block';
+    _saveAdminSession();
+    _startAdminSessionWatch();
     loadAll();
   }else{
     document.getElementById('login-error').style.display='block';
   }
 }
 function doLogout(){
+  _clearAdminSession();
+  if(_adminActivityTimer){clearInterval(_adminActivityTimer);_adminActivityTimer=null;}
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
   document.getElementById('login-pw').value='';
@@ -374,6 +423,8 @@ function showPage(id, el){
   if(id==='lectures') loadLectureAdmin();
   if(id==='tameru') loadTameruResults();
   if(id==='fuyasu') loadFuyasuResults();
+  if(id==='progress') loadProgress();
+  if(id==='dm') loadDMPage();
 }
 
 // ── テスト結果ページ ──
@@ -771,8 +822,137 @@ async function editLecture(id, currentTitle, currentUrl) {
   loadLectureAdmin();
 }
 
+// ── 受講生進捗 ──
+async function loadProgress(){
+  var el=document.getElementById('progress-table');
+  el.innerHTML='<div class="loading"><div class="spinner"></div>読み込み中</div>';
+  var [students,tameru,fuyasu,lectures,lectureProgress]=await Promise.all([
+    sbFetch('students?order=created_at.asc'),
+    sbFetch('test_results?test_id=eq.tameru&select=user_id,score,max_score'),
+    sbFetch('test_results?test_id=eq.fuyasu&select=user_id,score,max_score'),
+    sbFetch('lectures?select=id'),
+    sbFetch('lecture_progress?select=user_id,lecture_id')
+  ]);
+  var totalLectures=(Array.isArray(lectures)?lectures.length:0);
+  var tMap={},fMap={},lpMap={};
+  if(Array.isArray(tameru))tameru.forEach(function(r){if(!tMap[r.user_id])tMap[r.user_id]=r;});
+  if(Array.isArray(fuyasu))fuyasu.forEach(function(r){if(!fMap[r.user_id])fMap[r.user_id]=r;});
+  if(Array.isArray(lectureProgress))lectureProgress.forEach(function(r){if(!lpMap[r.user_id])lpMap[r.user_id]=0;lpMap[r.user_id]++;});
+  if(!Array.isArray(students)||!students.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">—</div>受講生がいません</div>';return;}
+  el.innerHTML='<table><thead><tr><th>受講生ID</th><th>氏名</th><th>貯める力</th><th>増やす力</th><th>講義視聴</th><th></th></tr></thead><tbody>'
+  +students.map(function(s){
+    var uid=s.auth_user_id||s.student_id;
+    var t=tMap[uid],f=fMap[uid];
+    var tCell=t?'<span class="mono" style="font-weight:700">'+t.score+'</span><span style="color:var(--text-muted);font-size:12px"> / '+t.max_score+'</span>':'<span class="badge badge-gray">未受験</span>';
+    var fCell=f?'<span class="mono" style="font-weight:700">'+f.score+'</span><span style="color:var(--text-muted);font-size:12px"> / '+f.max_score+'</span>':'<span class="badge badge-gray">未受験</span>';
+    var lp=lpMap[uid]||0;
+    var lpPct=totalLectures>0?Math.round(lp/totalLectures*100):0;
+    var lpCell='<div class="score-bar-wrap"><div class="score-bar-track"><div class="score-bar-fill" style="width:'+lpPct+'%"></div></div><span class="score-text">'+lp+'/'+totalLectures+'</span></div>';
+    var safeId=(s.student_id||'').replace(/'/g,"\\'");
+    var safeName=(s.name||'').replace(/'/g,"\\'");
+    return '<tr>'
+      +'<td class="mono">'+s.student_id+'</td>'
+      +'<td><strong>'+s.name+'</strong></td>'
+      +'<td>'+tCell+'</td>'
+      +'<td>'+fCell+'</td>'
+      +'<td>'+lpCell+'</td>'
+      +'<td><button class="btn btn-outline btn-sm" onclick="openDMModal(\''+safeId+'\',\''+safeName+'\')">DM送信</button></td>'
+      +'</tr>';
+  }).join('')+'</tbody></table>';
+}
+
+// ── DM ──
+var _dmTargetId=null;
+async function loadDMPage(){
+  var el=document.getElementById('dm-student-list');
+  var students=await sbFetch('students?order=created_at.asc');
+  var messages=await sbFetch('messages?select=to_student_id,is_read');
+  var unreadMap={};
+  if(Array.isArray(messages))messages.forEach(function(m){if(!m.is_read)unreadMap[m.to_student_id]=(unreadMap[m.to_student_id]||0)+1;});
+  if(!Array.isArray(students)||!students.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">—</div>受講生がいません</div>';return;}
+  el.innerHTML='<table><thead><tr><th>受講生ID</th><th>氏名</th><th>メール</th><th></th></tr></thead><tbody>'
+  +students.map(function(s){
+    var safeId=(s.student_id||'').replace(/'/g,"\\'");
+    var safeName=(s.name||'').replace(/'/g,"\\'");
+    var unread=unreadMap[s.student_id]||0;
+    return '<tr>'
+      +'<td class="mono">'+s.student_id+'</td>'
+      +'<td><strong>'+s.name+'</strong>'+(unread?'<span class="dm-unread-dot" title="未読'+unread+'件"></span>':'')+'</td>'
+      +'<td style="color:var(--text-muted)">'+(s.email||'—')+'</td>'
+      +'<td><button class="btn btn-primary btn-sm" onclick="openDMModal(\''+safeId+'\',\''+safeName+'\')">DM送信</button></td>'
+      +'</tr>';
+  }).join('')+'</tbody></table>';
+}
+
+async function openDMModal(studentId,name){
+  _dmTargetId=studentId;
+  document.getElementById('dm-modal-title').textContent=name+' へのDM';
+  document.getElementById('dm-body').value='';
+  document.getElementById('dm-modal').classList.add('active');
+  await _loadDMHistory(studentId);
+}
+function closeDMModal(){document.getElementById('dm-modal').classList.remove('active');_dmTargetId=null;}
+
+async function _loadDMHistory(studentId){
+  var el=document.getElementById('dm-history');
+  el.innerHTML='<div style="color:var(--text-muted);font-size:13px">読み込み中...</div>';
+  var data=await sbFetch('messages?to_student_id=eq.'+encodeURIComponent(studentId)+'&order=created_at.asc');
+  if(!Array.isArray(data)||!data.length){el.innerHTML='<div style="color:var(--text-muted);font-size:13px;text-align:center;padding:.5rem">まだメッセージはありません</div>';return;}
+  el.innerHTML=data.map(function(m){
+    var dt=new Date(m.created_at).toLocaleString('ja-JP');
+    return '<div class="dm-msg-admin"><div>'+m.body.replace(/\n/g,'<br>')+'</div><div class="dm-meta">'+dt+'</div></div>';
+  }).join('');
+  el.scrollTop=el.scrollHeight;
+}
+
+async function sendDM(){
+  if(!_dmTargetId)return;
+  var body=document.getElementById('dm-body').value.trim();
+  if(!body){showToast('メッセージを入力してください');return;}
+  var ok=await sbFetch('messages','POST',{to_student_id:_dmTargetId,body:body,from_role:'admin'});
+  if(ok!==false){
+    document.getElementById('dm-body').value='';
+    showToast('送信しました');
+    await _loadDMHistory(_dmTargetId);
+  }else{
+    showToast('送信に失敗しました');
+  }
+}
+
+// ── セッション復元 ──
+(function(){
+  try{
+    var raw=localStorage.getItem(ADMIN_SESSION_KEY);
+    if(!raw)return;
+    var s=JSON.parse(raw);
+    if(Date.now()-s.lastActivity>ADMIN_TIMEOUT){localStorage.removeItem(ADMIN_SESSION_KEY);return;}
+    document.getElementById('login-screen').style.display='none';
+    document.getElementById('app').style.display='block';
+    _startAdminSessionWatch();
+    loadAll();
+  }catch(e){}
+})();
+
 // 初期化
 loadAndRenderIDs();
 </script>
+<!-- DM モーダル -->
+<div class="dm-modal-overlay" id="dm-modal">
+  <div class="dm-modal-box">
+    <div class="modal-head">
+      <div class="modal-head-title" id="dm-modal-title">DM</div>
+      <button class="modal-close" onclick="closeDMModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div id="dm-history" style="max-height:320px;overflow-y:auto;margin-bottom:1rem;padding:.5rem;background:var(--bg);border-radius:6px;min-height:60px"></div>
+      <div class="field"><label>メッセージ</label><textarea id="dm-body" rows="4" placeholder="メッセージを入力してください"></textarea></div>
+      <div style="display:flex;justify-content:flex-end;gap:.6rem;margin-top:.5rem">
+        <button class="btn btn-outline" onclick="closeDMModal()">閉じる</button>
+        <button class="btn btn-primary" onclick="sendDM()">送信</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
