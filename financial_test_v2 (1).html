@@ -720,7 +720,7 @@ function submitTest(){
   completedTests[currentTestId]=true;
   (function(){
     var totalPoints = pArr.reduce(function(a,b){return a+b;},0);
-    var maxPoints = pArr.length * 10;
+    var maxPoints = pArr.reduce(function(a,b){return a+b;},0);
     sbFetch('test_results', 'POST', {
       user_id: currentUser.id,
       test_id: currentTestId,
