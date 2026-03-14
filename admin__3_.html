@@ -247,26 +247,55 @@ tbody tr:hover td{background:var(--bg)}
 
     <!-- LECTURES -->
     <div class="page" id="page-lectures">
-      <div class="page-header">
-        <div><div class="page-title">講義管理</div><div class="page-sub">受講生に表示する講義リストの登録・編集</div></div>
-      </div>
-      <div class="form-box">
-        <div class="form-box-title" id="lec-form-title">講義を追加</div>
-        <div style="display:grid;grid-template-columns:2fr 3fr auto auto;gap:.75rem;align-items:end;">
-          <div class="field"><label>講義タイトル</label><input type="text" id="lec-title" placeholder="例：第1講　お金の基本"></div>
-          <div class="field"><label>S3ファイル名</label><input type="text" id="lec-file" placeholder="例：ローソク足の見方.mp4"></div>
-          <div><button class="btn btn-primary" id="lec-submit-btn" onclick="addLecture()" style="margin-bottom:.85rem;">+ 追加</button></div>
-          <div><button class="btn btn-outline" id="lec-cancel-btn" onclick="cancelEditLecture()" style="margin-bottom:.85rem;display:none">キャンセル</button></div>
-        </div>
-      </div>
-      <div class="table-wrap">
-        <div class="table-header">
-          <div class="table-title">講義一覧</div>
-          <button class="btn btn-outline btn-sm" onclick="loadLectureAdmin()">更新</button>
-        </div>
-        <div id="lectures-table"><div class="loading"><div class="spinner"></div>読み込み中</div></div>
+  <div class="page-header">
+    <div><div class="page-title">講義管理</div><div class="page-sub">コース・カテゴリー・講義の登録・編集</div></div>
+    <button class="btn btn-outline btn-sm" onclick="loadLectureAdmin()">更新</button>
+  </div>
+  <div style="display:flex;gap:0;margin-bottom:1.5rem;border-bottom:2px solid var(--border)">
+    <button id="lec-subtab-btn-course" onclick="showLecSubtab('course',this)" style="padding:.6rem 1.25rem;border:none;background:none;font-size:13px;font-weight:700;cursor:pointer;border-bottom:2px solid var(--navy);margin-bottom:-2px;color:var(--navy)">コース</button>
+    <button id="lec-subtab-btn-category" onclick="showLecSubtab('category',this)" style="padding:.6rem 1.25rem;border:none;background:none;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-muted)">カテゴリー</button>
+    <button id="lec-subtab-btn-lecture" onclick="showLecSubtab('lecture',this)" style="padding:.6rem 1.25rem;border:none;background:none;font-size:13px;font-weight:600;cursor:pointer;color:var(--text-muted)">講義</button>
+  </div>
+  <!-- コース管理 -->
+  <div id="lec-section-course">
+    <div class="form-box">
+      <div class="form-box-title" id="course-form-title">コースを追加</div>
+      <div style="display:grid;grid-template-columns:1fr auto auto;gap:.75rem;align-items:end">
+        <div class="field"><label>コース名</label><input type="text" id="course-title" placeholder="例：貯める力"></div>
+        <div><button class="btn btn-primary" id="course-submit-btn" onclick="addCourse()" style="margin-bottom:.85rem">+ 追加</button></div>
+        <div><button class="btn btn-outline" id="course-cancel-btn" onclick="cancelEditCourse()" style="margin-bottom:.85rem;display:none">キャンセル</button></div>
       </div>
     </div>
+    <div class="table-wrap"><div id="courses-table"><div class="loading"><div class="spinner"></div>読み込み中</div></div></div>
+  </div>
+  <!-- カテゴリー管理 -->
+  <div id="lec-section-category" style="display:none">
+    <div class="form-box">
+      <div class="form-box-title" id="cat-form-title">カテゴリーを追加</div>
+      <div style="display:grid;grid-template-columns:1fr 2fr auto auto;gap:.75rem;align-items:end">
+        <div class="field"><label>コース</label><select id="cat-course-id" style="width:100%;padding:.65rem .75rem;border:1.5px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:inherit"></select></div>
+        <div class="field"><label>カテゴリー名</label><input type="text" id="cat-title" placeholder="例：テクニカル分析の基本"></div>
+        <div><button class="btn btn-primary" id="cat-submit-btn" onclick="addCategory()" style="margin-bottom:.85rem">+ 追加</button></div>
+        <div><button class="btn btn-outline" id="cat-cancel-btn" onclick="cancelEditCategory()" style="margin-bottom:.85rem;display:none">キャンセル</button></div>
+      </div>
+    </div>
+    <div class="table-wrap"><div id="categories-table"><div class="loading"><div class="spinner"></div>読み込み中</div></div></div>
+  </div>
+  <!-- 講義管理 -->
+  <div id="lec-section-lecture" style="display:none">
+    <div class="form-box">
+      <div class="form-box-title" id="lec-form-title">講義を追加</div>
+      <div style="display:grid;grid-template-columns:1fr 2fr 2fr auto auto;gap:.75rem;align-items:end">
+        <div class="field"><label>カテゴリー</label><select id="lec-category-id" style="width:100%;padding:.65rem .75rem;border:1.5px solid var(--border);border-radius:var(--radius);font-size:13px;font-family:inherit"></select></div>
+        <div class="field"><label>講義タイトル</label><input type="text" id="lec-title" placeholder="例：ローソク足の見方"></div>
+        <div class="field"><label>S3ファイル名</label><input type="text" id="lec-file" placeholder="例：ローソク足の見方.mp4"></div>
+        <div><button class="btn btn-primary" id="lec-submit-btn" onclick="addLecture()" style="margin-bottom:.85rem">+ 追加</button></div>
+        <div><button class="btn btn-outline" id="lec-cancel-btn" onclick="cancelEditLecture()" style="margin-bottom:.85rem;display:none">キャンセル</button></div>
+      </div>
+    </div>
+    <div class="table-wrap"><div id="lectures-table"><div class="loading"><div class="spinner"></div>読み込み中</div></div></div>
+  </div>
+</div>
 
     <!-- CSV EXPORT -->
     <div class="page" id="page-export">
@@ -618,10 +647,12 @@ async function openStudentDetail(studentId){
   modal.style.display='flex';
   body.innerHTML='<div class="loading"><div class="spinner"></div>読み込み中</div>';
   var student=sbStudents.find(function(s){return s.student_id===studentId;});
-  var [results,lectureProgress,lectures]=await Promise.all([
+  var [results,lectureProgress,lectures,categories,courses]=await Promise.all([
     sbFetch('test_results?user_id=eq.'+encodeURIComponent(studentId)+'&order=submitted_at.desc'),
     sbFetch('lecture_progress?user_id=eq.'+encodeURIComponent(studentId)),
-    sbFetch('lectures?select=id,title&order=sort_order.asc,created_at.asc')
+    sbFetch('lectures?select=id,title,category_id&order=sort_order.asc,created_at.asc'),
+    sbFetch('categories?select=id,title,course_id&order=sort_order.asc'),
+    sbFetch('courses?select=id,title&order=sort_order.asc')
   ]);
   var name=student?student.name:studentId;
   var email=student?(student.email||'—'):'—';
@@ -642,14 +673,35 @@ async function openStudentDetail(studentId){
       +(r.submitted_at?'<div style="font-size:11px;color:var(--text-muted);margin-top:.3rem">'+new Date(r.submitted_at).toLocaleString('ja-JP')+'</div>':'');
   }
   var lecRows='';
-  if(Array.isArray(lectures)&&lectures.length){
-    lecRows=lectures.map(function(l,i){
-      var done=lpIds.has(String(l.id));
-      return '<div style="display:flex;align-items:center;gap:.5rem;padding:.35rem 0;border-bottom:1px solid #f1f5f9">'
-        +'<span style="font-size:15px">'+(done?'✅':'⬜')+'</span>'
-        +'<span style="font-size:13px;color:'+(done?'#1e293b':'var(--text-muted)')+'">講義'+(i+1).toString().padStart(2,'0')+' &nbsp;'+l.title+'</span>'
-        +'</div>';
-    }).join('');
+  if(Array.isArray(courses)&&courses.length&&Array.isArray(lectures)&&lectures.length){
+    courses.forEach(function(course){
+      var cats=(Array.isArray(categories)?categories:[]).filter(function(c){return c.course_id===course.id;});
+      if(!cats.length)return;
+      lecRows+='<div style="font-weight:700;font-size:13px;color:var(--navy);margin:.75rem 0 .25rem">'+course.title+'</div>';
+      cats.forEach(function(cat){
+        var lecs=lectures.filter(function(l){return l.category_id===cat.id;});
+        if(!lecs.length)return;
+        lecRows+='<div style="font-size:12px;font-weight:600;color:var(--text-muted);padding:.4rem 0 .2rem;border-top:1px solid #f1f5f9;margin-top:.25rem">'+cat.title+'</div>';
+        lecs.forEach(function(l){
+          var done=lpIds.has(String(l.id));
+          lecRows+='<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0 .3rem .5rem;border-bottom:1px solid #f8fafc">'
+            +'<span style="font-size:14px">'+(done?'✅':'⬜')+'</span>'
+            +'<span style="font-size:13px;color:'+(done?'#1e293b':'var(--text-muted)')+'">'+l.title+'</span>'
+            +'</div>';
+        });
+      });
+    });
+    var uncategorized=lectures.filter(function(l){return !l.category_id;});
+    if(uncategorized.length){
+      lecRows+='<div style="font-size:12px;font-weight:600;color:var(--text-muted);padding:.4rem 0 .2rem;border-top:1px solid #f1f5f9;margin-top:.25rem">未分類</div>';
+      uncategorized.forEach(function(l){
+        var done=lpIds.has(String(l.id));
+        lecRows+='<div style="display:flex;align-items:center;gap:.5rem;padding:.3rem 0 .3rem .5rem">'
+          +'<span style="font-size:14px">'+(done?'✅':'⬜')+'</span>'
+          +'<span style="font-size:13px;color:'+(done?'#1e293b':'var(--text-muted)')+'">'+l.title+'</span>'
+          +'</div>';
+      });
+    }
   }
   var safeId=(studentId||'').replace(/'/g,"\\'");
   var safeName=(name||'').replace(/'/g,"\\'");
@@ -891,61 +943,216 @@ function showToast(msg){
 }
 
 // ── 講義管理 ──
-let lectureData = [];
+let lectureData=[], courseData=[], categoryData=[];
 
-async function loadLectureAdmin() {
-  var data = await sbFetch('lectures?order=sort_order.asc,created_at.asc');
-  lectureData = Array.isArray(data) ? data : [];
+function showLecSubtab(name, btn){
+  ['course','category','lecture'].forEach(function(s){
+    document.getElementById('lec-section-'+s).style.display=(s===name?'':'none');
+    var b=document.getElementById('lec-subtab-btn-'+s);
+    b.style.fontWeight=s===name?'700':'600';
+    b.style.color=s===name?'var(--navy)':'var(--text-muted)';
+    b.style.borderBottom=s===name?'2px solid var(--navy)':'none';
+    b.style.marginBottom=s===name?'-2px':'0';
+  });
+  if(name==='category') populateCourseSelect('cat-course-id');
+  if(name==='lecture') populateCategorySelect('lec-category-id');
+}
+
+function populateCourseSelect(selId){
+  var sel=document.getElementById(selId);
+  if(!sel)return;
+  sel.innerHTML='<option value="">-- コースを選択 --</option>'
+    +courseData.map(function(c){return '<option value="'+c.id+'">'+c.title+'</option>';}).join('');
+}
+function populateCategorySelect(selId){
+  var sel=document.getElementById(selId);
+  if(!sel)return;
+  sel.innerHTML='<option value="">-- カテゴリーを選択 --</option>'
+    +categoryData.map(function(c){
+      var course=courseData.find(function(x){return x.id===c.course_id;})||{title:'?'};
+      return '<option value="'+c.id+'">'+course.title+' › '+c.title+'</option>';
+    }).join('');
+}
+
+async function loadLectureAdmin(){
+  var [courses,categories,lectures]=await Promise.all([
+    sbFetch('courses?order=sort_order.asc,created_at.asc'),
+    sbFetch('categories?order=sort_order.asc,created_at.asc'),
+    sbFetch('lectures?order=sort_order.asc,created_at.asc')
+  ]);
+  courseData=Array.isArray(courses)?courses:[];
+  categoryData=Array.isArray(categories)?categories:[];
+  lectureData=Array.isArray(lectures)?lectures:[];
+  renderCourses();
+  renderCategories();
   renderLectures();
 }
 
-function renderLectures() {
-  var el = document.getElementById('lectures-table');
-  if (!lectureData.length) {
-    el.innerHTML = '<div class="empty-state"><div class="empty-icon" style="font-size:36px;margin-bottom:.75rem;">—</div>まだ講義がありません</div>';
-    return;
-  }
-  el.innerHTML = '<table><thead><tr><th>#</th><th>タイトル</th><th>S3ファイル名</th><th></th></tr></thead><tbody>'
-    + lectureData.map(function(l, i) {
-      var safeTitle = l.title.replace(/'/g, "\\'");
-      var safeFile = (l.file||'').replace(/'/g, "\\'");
+function renderCourses(){
+  var el=document.getElementById('courses-table');
+  if(!el)return;
+  if(!courseData.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">—</div>まだコースがありません</div>';return;}
+  el.innerHTML='<table><thead><tr><th>#</th><th>コース名</th><th>カテゴリー数</th><th></th></tr></thead><tbody>'
+    +courseData.map(function(c,i){
+      var catCount=categoryData.filter(function(x){return x.course_id===c.id;}).length;
+      var safeTitle=c.title.replace(/'/g,"\\'");
       return '<tr>'
-        + '<td style="color:var(--text-muted);font-family:\'DM Mono\',monospace;font-size:12px;">' + String(i+1).padStart(2,'0') + '</td>'
-        + '<td><strong>' + l.title + '</strong></td>'
-        + '<td style="color:var(--text-muted);font-size:12px;font-family:monospace">' + (l.file || '—') + '</td>'
-        + '<td style="display:flex;gap:.4rem;">'
-        + '<button class="btn btn-outline btn-sm" onclick="editLecture(\'' + l.id + '\',\'' + safeTitle + '\',\'' + safeFile + '\')">編集</button>'
-        + '<button class="btn btn-red btn-sm" onclick="deleteLecture(\'' + l.id + '\')">削除</button>'
-        + '</td>'
-        + '</tr>';
-    }).join('') + '</tbody></table>';
+        +'<td style="color:var(--text-muted);font-size:12px">'+String(i+1).padStart(2,'0')+'</td>'
+        +'<td><strong>'+c.title+'</strong></td>'
+        +'<td style="color:var(--text-muted)">'+catCount+'件</td>'
+        +'<td style="display:flex;gap:.4rem">'
+        +'<button class="btn btn-outline btn-sm" onclick="editCourse(\''+c.id+'\',\''+safeTitle+'\')">編集</button>'
+        +'<button class="btn btn-red btn-sm" onclick="deleteCourse(\''+c.id+'\')">削除</button>'
+        +'</td></tr>';
+    }).join('')+'</tbody></table>';
 }
 
-async function addLecture() {
-  var title = document.getElementById('lec-title').value.trim();
-  var file  = document.getElementById('lec-file').value.trim();
-  if (!title) { showToast('タイトルを入力してください'); return; }
-  var ok = await sbFetch('lectures','POST',{title:title,file:file,sort_order:lectureData.length});
+function renderCategories(){
+  var el=document.getElementById('categories-table');
+  if(!el)return;
+  if(!categoryData.length){el.innerHTML='<div class="empty-state"><div class="empty-icon">—</div>まだカテゴリーがありません</div>';return;}
+  el.innerHTML='<table><thead><tr><th>コース</th><th>カテゴリー名</th><th>講義数</th><th></th></tr></thead><tbody>'
+    +categoryData.map(function(c){
+      var course=courseData.find(function(x){return x.id===c.course_id;})||{title:'—'};
+      var lecCount=lectureData.filter(function(l){return l.category_id===c.id;}).length;
+      var safeTitle=c.title.replace(/'/g,"\\'");
+      var safeCourse=course.title.replace(/'/g,"\\'");
+      return '<tr>'
+        +'<td style="color:var(--text-muted);font-size:12px">'+course.title+'</td>'
+        +'<td><strong>'+c.title+'</strong></td>'
+        +'<td style="color:var(--text-muted)">'+lecCount+'件</td>'
+        +'<td style="display:flex;gap:.4rem">'
+        +'<button class="btn btn-outline btn-sm" onclick="editCategory(\''+c.id+'\',\''+c.course_id+'\',\''+safeTitle+'\')">編集</button>'
+        +'<button class="btn btn-red btn-sm" onclick="deleteCategory(\''+c.id+'\')">削除</button>'
+        +'</td></tr>';
+    }).join('')+'</tbody></table>';
+}
+
+function renderLectures(){
+  var el=document.getElementById('lectures-table');
+  if(!el)return;
+  if(!lectureData.length){el.innerHTML='<div class="empty-state"><div class="empty-icon" style="font-size:36px;margin-bottom:.75rem;">—</div>まだ講義がありません</div>';return;}
+  el.innerHTML='<table><thead><tr><th>#</th><th>カテゴリー</th><th>タイトル</th><th>S3ファイル名</th><th></th></tr></thead><tbody>'
+    +lectureData.map(function(l,i){
+      var cat=categoryData.find(function(c){return c.id===l.category_id;})||{title:'未分類'};
+      var course=cat.course_id?courseData.find(function(c){return c.id===cat.course_id;})||{title:''}:{title:''};
+      var safeTitle=l.title.replace(/'/g,"\\'");
+      var safeFile=(l.file||'').replace(/'/g,"\\'");
+      var safeCatId=String(l.category_id||'');
+      return '<tr>'
+        +'<td style="color:var(--text-muted);font-family:\'DM Mono\',monospace;font-size:12px">'+String(i+1).padStart(2,'0')+'</td>'
+        +'<td style="font-size:12px;color:var(--text-muted)">'+(course.title?course.title+' › ':'')+cat.title+'</td>'
+        +'<td><strong>'+l.title+'</strong></td>'
+        +'<td style="color:var(--text-muted);font-size:12px;font-family:monospace">'+(l.file||'—')+'</td>'
+        +'<td style="display:flex;gap:.4rem">'
+        +'<button class="btn btn-outline btn-sm" onclick="editLecture(\''+l.id+'\',\''+safeTitle+'\',\''+safeFile+'\',\''+safeCatId+'\')">編集</button>'
+        +'<button class="btn btn-red btn-sm" onclick="deleteLecture(\''+l.id+'\')">削除</button>'
+        +'</td></tr>';
+    }).join('')+'</tbody></table>';
+}
+
+// ── コース CRUD ──
+async function addCourse(){
+  var title=document.getElementById('course-title').value.trim();
+  if(!title){showToast('コース名を入力してください');return;}
+  var ok=await sbFetch('courses','POST',{title:title,sort_order:courseData.length});
+  if(ok){showToast('コースを追加しました');document.getElementById('course-title').value='';loadLectureAdmin();}
+  else showToast('追加に失敗しました');
+}
+var _editingCourseId=null;
+function editCourse(id,currentTitle){
+  _editingCourseId=id;
+  document.getElementById('course-title').value=currentTitle;
+  document.getElementById('course-form-title').textContent='コースを編集';
+  document.getElementById('course-submit-btn').textContent='更新';
+  document.getElementById('course-submit-btn').onclick=saveCourseEdit;
+  document.getElementById('course-cancel-btn').style.display='';
+}
+function cancelEditCourse(){
+  _editingCourseId=null;
+  document.getElementById('course-title').value='';
+  document.getElementById('course-form-title').textContent='コースを追加';
+  document.getElementById('course-submit-btn').textContent='+ 追加';
+  document.getElementById('course-submit-btn').onclick=addCourse;
+  document.getElementById('course-cancel-btn').style.display='none';
+}
+async function saveCourseEdit(){
+  var title=document.getElementById('course-title').value.trim();
+  if(!title){showToast('コース名を入力してください');return;}
+  await sbFetch('courses?id=eq.'+_editingCourseId,'PATCH',{title:title});
+  showToast('更新しました');cancelEditCourse();loadLectureAdmin();
+}
+async function deleteCourse(id){
+  if(!confirm('このコースを削除しますか？\n配下のカテゴリーと講義も削除されます。'))return;
+  await sbFetch('courses?id=eq.'+id,'DELETE');
+  showToast('削除しました');loadLectureAdmin();
+}
+
+// ── カテゴリー CRUD ──
+async function addCategory(){
+  var courseId=document.getElementById('cat-course-id').value;
+  var title=document.getElementById('cat-title').value.trim();
+  if(!courseId||!title){showToast('コースとカテゴリー名を入力してください');return;}
+  var ok=await sbFetch('categories','POST',{course_id:parseInt(courseId),title:title,sort_order:categoryData.filter(function(c){return c.course_id===parseInt(courseId);}).length});
+  if(ok){showToast('カテゴリーを追加しました');document.getElementById('cat-title').value='';loadLectureAdmin();}
+  else showToast('追加に失敗しました');
+}
+var _editingCategoryId=null;
+function editCategory(id,courseId,currentTitle){
+  _editingCategoryId=id;
+  populateCourseSelect('cat-course-id');
+  document.getElementById('cat-course-id').value=courseId;
+  document.getElementById('cat-title').value=currentTitle;
+  document.getElementById('cat-form-title').textContent='カテゴリーを編集';
+  document.getElementById('cat-submit-btn').textContent='更新';
+  document.getElementById('cat-submit-btn').onclick=saveCategoryEdit;
+  document.getElementById('cat-cancel-btn').style.display='';
+}
+function cancelEditCategory(){
+  _editingCategoryId=null;
+  document.getElementById('cat-title').value='';
+  document.getElementById('cat-form-title').textContent='カテゴリーを追加';
+  document.getElementById('cat-submit-btn').textContent='+ 追加';
+  document.getElementById('cat-submit-btn').onclick=addCategory;
+  document.getElementById('cat-cancel-btn').style.display='none';
+}
+async function saveCategoryEdit(){
+  var courseId=document.getElementById('cat-course-id').value;
+  var title=document.getElementById('cat-title').value.trim();
+  if(!title){showToast('カテゴリー名を入力してください');return;}
+  await sbFetch('categories?id=eq.'+_editingCategoryId,'PATCH',{title:title,course_id:parseInt(courseId)});
+  showToast('更新しました');cancelEditCategory();loadLectureAdmin();
+}
+async function deleteCategory(id){
+  if(!confirm('このカテゴリーを削除しますか？'))return;
+  await sbFetch('categories?id=eq.'+id,'DELETE');
+  showToast('削除しました');loadLectureAdmin();
+}
+
+// ── 講義 CRUD ──
+async function addLecture(){
+  var catId=document.getElementById('lec-category-id').value;
+  var title=document.getElementById('lec-title').value.trim();
+  var file=document.getElementById('lec-file').value.trim();
+  if(!catId||!title){showToast('カテゴリーと講義タイトルを入力してください');return;}
+  var ok=await sbFetch('lectures','POST',{category_id:parseInt(catId),title:title,file:file,sort_order:lectureData.length});
   if(ok){
     showToast('追加しました：'+title);
     document.getElementById('lec-title').value='';
     document.getElementById('lec-file').value='';
     loadLectureAdmin();
-  }else{
-    showToast('追加に失敗しました');
-  }
+  }else showToast('追加に失敗しました');
 }
-
-async function deleteLecture(id) {
+async function deleteLecture(id){
   if(!confirm('この講義を削除しますか？'))return;
   await sbFetch('lectures?id=eq.'+id,'DELETE');
-  showToast('削除しました');
-  loadLectureAdmin();
+  showToast('削除しました');loadLectureAdmin();
 }
-
 var _editingLectureId=null;
-function editLecture(id, currentTitle, currentFile){
+function editLecture(id,currentTitle,currentFile,currentCatId){
   _editingLectureId=id;
+  populateCategorySelect('lec-category-id');
+  document.getElementById('lec-category-id').value=currentCatId;
   document.getElementById('lec-title').value=currentTitle;
   document.getElementById('lec-file').value=currentFile||'';
   document.getElementById('lec-form-title').textContent='講義を編集';
@@ -964,13 +1171,12 @@ function cancelEditLecture(){
   document.getElementById('lec-cancel-btn').style.display='none';
 }
 async function saveLectureEdit(){
+  var catId=document.getElementById('lec-category-id').value;
   var title=document.getElementById('lec-title').value.trim();
   var file=document.getElementById('lec-file').value.trim();
   if(!title){showToast('タイトルを入力してください');return;}
-  await sbFetch('lectures?id=eq.'+_editingLectureId,'PATCH',{title:title,file:file});
-  showToast('更新しました');
-  cancelEditLecture();
-  loadLectureAdmin();
+  await sbFetch('lectures?id=eq.'+_editingLectureId,'PATCH',{title:title,file:file,category_id:catId?parseInt(catId):null});
+  showToast('更新しました');cancelEditLecture();loadLectureAdmin();
 }
 
 // ── 受講生進捗 ──
