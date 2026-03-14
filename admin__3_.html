@@ -674,7 +674,17 @@ async function toggleIDActive(studentId, currentActive){
 }
 
 async function deleteID(studentId, name){
-  if(!confirm('「'+name+'」（'+studentId+'）を削除しますか？'))return;
+  if(!confirm('「'+name+'」（'+studentId+'）を削除しますか？\n\nテスト結果・メッセージ・講義進捗もすべて削除されます。'))return;
+  // test_results の id を取得して test_answers も削除
+  var results=await sbFetch('test_results?user_id=eq.'+encodeURIComponent(studentId)+'&select=id');
+  if(Array.isArray(results)&&results.length){
+    await Promise.all(results.map(function(r){return sbFetch('test_answers?result_id=eq.'+r.id,'DELETE');}));
+    await sbFetch('test_results?user_id=eq.'+encodeURIComponent(studentId),'DELETE');
+  }
+  await Promise.all([
+    sbFetch('messages?to_student_id=eq.'+encodeURIComponent(studentId),'DELETE'),
+    sbFetch('lecture_progress?user_id=eq.'+encodeURIComponent(studentId),'DELETE'),
+  ]);
   await sbFetch('students?student_id=eq.'+encodeURIComponent(studentId),'DELETE');
   showToast('削除しました');
   loadAndRenderIDs();
