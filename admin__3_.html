@@ -251,11 +251,12 @@ tbody tr:hover td{background:var(--bg)}
         <div><div class="page-title">講義管理</div><div class="page-sub">受講生に表示する講義リストの登録・編集</div></div>
       </div>
       <div class="form-box">
-        <div class="form-box-title">講義を追加</div>
-        <div style="display:grid;grid-template-columns:2fr 3fr auto;gap:.75rem;align-items:end;">
+        <div class="form-box-title" id="lec-form-title">講義を追加</div>
+        <div style="display:grid;grid-template-columns:2fr 3fr auto auto;gap:.75rem;align-items:end;">
           <div class="field"><label>講義タイトル</label><input type="text" id="lec-title" placeholder="例：第1講　お金の基本"></div>
           <div class="field"><label>動画URL（任意）</label><input type="text" id="lec-url" placeholder="例：https://youtu.be/xxxx"></div>
-          <div><button class="btn btn-primary" onclick="addLecture()" style="margin-bottom:.85rem;">+ 追加</button></div>
+          <div><button class="btn btn-primary" id="lec-submit-btn" onclick="addLecture()" style="margin-bottom:.85rem;">+ 追加</button></div>
+          <div><button class="btn btn-outline" id="lec-cancel-btn" onclick="cancelEditLecture()" style="margin-bottom:.85rem;display:none">キャンセル</button></div>
         </div>
       </div>
       <div class="table-wrap">
@@ -602,6 +603,10 @@ async function loadAndRenderIDs(){
   renderIDs();
 }
 
+async function hashPassword(pw){
+  var buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+}
 function autoGenPw(){
   var chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
   var pw='';for(var i=0;i<10;i++)pw+=chars[Math.floor(Math.random()*chars.length)];
@@ -621,7 +626,8 @@ async function generateID(){
     studentId='MA'+num; tries++;
   }while(sbStudents.some(e=>e.student_id===studentId)&&tries<100);
 
-  var ok = await sbFetch('students','POST',{student_id:studentId,name:name,email:email,password:pw,active:true});
+  var hashedPw=await hashPassword(pw);
+  var ok = await sbFetch('students','POST',{student_id:studentId,name:name,email:email,password:hashedPw,active:true});
   if(ok!==false){
     _lastIssued={name:name,id:studentId,email:email,pw:pw};
     document.getElementById('ic-name').textContent=name;
@@ -643,6 +649,23 @@ function copyIssuedInfo(){
   if(!_lastIssued)return;
   var text='【受講生情報】\n氏名：'+_lastIssued.name+'\n受講生ID：'+_lastIssued.id+'\nメールアドレス：'+_lastIssued.email+'\n初期パスワード：'+_lastIssued.pw;
   navigator.clipboard.writeText(text).then(function(){showToast('コピーしました');}).catch(function(){showToast('コピーに失敗しました');});
+}
+
+async function resetPassword(studentId){
+  var chars='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  var newPw='';for(var i=0;i<10;i++)newPw+=chars[Math.floor(Math.random()*chars.length)];
+  var hashed=await hashPassword(newPw);
+  var ok=await sbFetch('students?student_id=eq.'+encodeURIComponent(studentId),'PATCH',{password:hashed});
+  if(ok!==false){
+    document.getElementById('ic-name').textContent=sbStudents.find(function(s){return s.student_id===studentId;})||{name:studentId};
+    document.getElementById('ic-id').textContent=studentId;
+    document.getElementById('ic-email').textContent='—';
+    document.getElementById('ic-pw').textContent=newPw;
+    document.getElementById('issued-card').style.display='block';
+    showToast('パスワードを再発行しました');
+  }else{
+    showToast('リセットに失敗しました');
+  }
 }
 
 async function toggleIDActive(studentId, currentActive){
@@ -673,11 +696,12 @@ function renderIDs(){
       +'<td class="mono"><strong>'+e.student_id+'</strong></td>'
       +'<td>'+e.name+'</td>'
       +'<td style="color:var(--text-muted)">'+(e.email||'—')+'</td>'
-      +'<td class="mono">'+(e.password||'—')+'</td>'
+      +'<td class="mono" style="letter-spacing:.1em">••••••••</td>'
       +'<td style="color:var(--text-muted);font-size:12px">'+createdAt+'</td>'
       +'<td>'+status+'</td>'
       +'<td>'+(e.active?'<span class="badge badge-green">有効</span>':'<span class="badge badge-red">無効</span>')+'</td>'
       +'<td style="display:flex;gap:.4rem;">'
+      +'<button class="btn btn-outline btn-sm" onclick="resetPassword(\''+safeId+'\')">PW再発行</button>'
       +'<button class="btn btn-outline btn-sm" onclick="toggleIDActive(\''+safeId+'\','+e.active+')">'+(e.active?'無効化':'有効化')+'</button>'
       +'<button class="btn btn-red btn-sm" onclick="deleteID(\''+safeId+'\',\''+safeName+'\')">削除</button>'
       +'</td></tr>';
@@ -806,19 +830,39 @@ async function addLecture() {
 }
 
 async function deleteLecture(id) {
-  if (!confirm('この講義を削除しますか？')) return;
+  if(!confirm('この講義を削除しますか？'))return;
   await sbFetch('lectures?id=eq.'+id,'DELETE');
   showToast('削除しました');
   loadLectureAdmin();
 }
 
-async function editLecture(id, currentTitle, currentUrl) {
-  var newTitle = prompt('講義タイトルを編集', currentTitle);
-  if (newTitle === null) return;
-  var newUrl = prompt('動画URLを編集（なければ空白）', currentUrl);
-  if (newUrl === null) return;
-  await sbFetch('lectures?id=eq.'+id,'PATCH',{title:newTitle.trim(),url:(newUrl||'').trim()});
+var _editingLectureId=null;
+function editLecture(id, currentTitle, currentUrl){
+  _editingLectureId=id;
+  document.getElementById('lec-title').value=currentTitle;
+  document.getElementById('lec-url').value=currentUrl||'';
+  document.getElementById('lec-form-title').textContent='講義を編集';
+  document.getElementById('lec-submit-btn').textContent='更新';
+  document.getElementById('lec-submit-btn').onclick=saveLectureEdit;
+  document.getElementById('lec-cancel-btn').style.display='';
+  document.getElementById('lec-title').focus();
+}
+function cancelEditLecture(){
+  _editingLectureId=null;
+  document.getElementById('lec-title').value='';
+  document.getElementById('lec-url').value='';
+  document.getElementById('lec-form-title').textContent='講義を追加';
+  document.getElementById('lec-submit-btn').textContent='+ 追加';
+  document.getElementById('lec-submit-btn').onclick=addLecture;
+  document.getElementById('lec-cancel-btn').style.display='none';
+}
+async function saveLectureEdit(){
+  var title=document.getElementById('lec-title').value.trim();
+  var url=document.getElementById('lec-url').value.trim();
+  if(!title){showToast('タイトルを入力してください');return;}
+  await sbFetch('lectures?id=eq.'+_editingLectureId,'PATCH',{title:title,url:url});
   showToast('更新しました');
+  cancelEditLecture();
   loadLectureAdmin();
 }
 
@@ -856,9 +900,27 @@ async function loadProgress(){
       +'<td>'+tCell+'</td>'
       +'<td>'+fCell+'</td>'
       +'<td>'+lpCell+'</td>'
-      +'<td><button class="btn btn-outline btn-sm" onclick="openDMModal(\''+safeId+'\',\''+safeName+'\')">DM送信</button></td>'
+      +'<td style="display:flex;gap:.3rem;flex-wrap:wrap">'
+      +'<button class="btn btn-outline btn-sm" onclick="openDMModal(\''+safeId+'\',\''+safeName+'\')">DM</button>'
+      +(t?'<button class="btn btn-red btn-sm" onclick="resetTest(\''+uid+'\',\'tameru\')">貯リセット</button>':'')
+      +(f?'<button class="btn btn-red btn-sm" onclick="resetTest(\''+uid+'\',\'fuyasu\')">増リセット</button>':'')
+      +'</td>'
       +'</tr>';
   }).join('')+'</tbody></table>';
+}
+
+// ── テストリセット ──
+async function resetTest(userId,testId){
+  var label=testId==='tameru'?'貯める力':'増やす力';
+  if(!confirm(label+'のテスト結果をリセットしますか？この操作は取り消せません。'))return;
+  var results=await sbFetch('test_results?user_id=eq.'+encodeURIComponent(userId)+'&test_id=eq.'+testId+'&select=id');
+  if(Array.isArray(results)&&results.length){
+    var ids=results.map(function(r){return r.id;});
+    await Promise.all(ids.map(function(id){return sbFetch('test_answers?result_id=eq.'+id,'DELETE');}));
+    await sbFetch('test_results?user_id=eq.'+encodeURIComponent(userId)+'&test_id=eq.'+testId,'DELETE');
+  }
+  showToast(label+'のテスト結果をリセットしました');
+  loadProgress();
 }
 
 // ── DM ──
@@ -914,6 +976,16 @@ async function sendDM(){
     document.getElementById('dm-body').value='';
     showToast('送信しました');
     await _loadDMHistory(_dmTargetId);
+    // メール通知
+    var student=sbStudents.find(function(s){return s.student_id===_dmTargetId;});
+    if(student&&student.email){
+      var subject=encodeURIComponent('【MONEY ACADEMY】新しいメッセージが届いています');
+      var mailBody=encodeURIComponent(student.name+'さん\n\nMONEY ACADEMYよりメッセージが届いています。\nポータルのDM欄からご確認ください。\n\n---\n'+body);
+      var mailLink=document.getElementById('dm-mail-link');
+      if(!mailLink){mailLink=document.createElement('a');mailLink.id='dm-mail-link';mailLink.style.display='none';document.body.appendChild(mailLink);}
+      mailLink.href='mailto:'+student.email+'?subject='+subject+'&body='+mailBody;
+      mailLink.click();
+    }
   }else{
     showToast('送信に失敗しました');
   }
