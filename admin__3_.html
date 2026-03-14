@@ -254,7 +254,7 @@ tbody tr:hover td{background:var(--bg)}
         <div class="form-box-title" id="lec-form-title">講義を追加</div>
         <div style="display:grid;grid-template-columns:2fr 3fr auto auto;gap:.75rem;align-items:end;">
           <div class="field"><label>講義タイトル</label><input type="text" id="lec-title" placeholder="例：第1講　お金の基本"></div>
-          <div class="field"><label>動画URL（任意）</label><input type="text" id="lec-url" placeholder="例：https://youtu.be/xxxx"></div>
+          <div class="field"><label>S3ファイル名</label><input type="text" id="lec-file" placeholder="例：ローソク足の見方.mp4"></div>
           <div><button class="btn btn-primary" id="lec-submit-btn" onclick="addLecture()" style="margin-bottom:.85rem;">+ 追加</button></div>
           <div><button class="btn btn-outline" id="lec-cancel-btn" onclick="cancelEditLecture()" style="margin-bottom:.85rem;display:none">キャンセル</button></div>
         </div>
@@ -501,23 +501,7 @@ async function exportAnswerCSV(testId){
 }
 
 // ── Load All ──
-// 受講生ポータルと同じ講義リスト（進捗表示用）
-const ADMIN_LECTURE_LIST = [
-  {id:'l01',title:'ローソク足の見方'},
-  {id:'l02',title:'出来高の見方'},
-  {id:'l03',title:'テクニカル分析の原則'},
-  {id:'l04',title:'トレンドの種類'},
-  {id:'l05',title:'トレンドラインの引き方'},
-  {id:'l06',title:'トレンドラインの引き方実践'},
-  {id:'l07',title:'トレンドラインの役割・引き方'},
-  {id:'l08',title:'トレンドラインの使い方'},
-  {id:'l09',title:'トレンド別の投資判断'},
-  {id:'l10',title:'水平線の引き方'},
-  {id:'l11',title:'水平線を引いてみよう【TradingView】'},
-  {id:'l12',title:'移動平均線の見方'},
-  {id:'l13',title:'TradingViewの使い方'},
-  {id:'l14',title:'銘柄スクリーニング機能を使いこなそう'},
-];
+
 async function loadAll(){
   document.getElementById('last-updated').textContent='読み込み中…';
   var [tameru, fuyasu] = await Promise.all([
@@ -634,11 +618,11 @@ async function openStudentDetail(studentId){
   modal.style.display='flex';
   body.innerHTML='<div class="loading"><div class="spinner"></div>読み込み中</div>';
   var student=sbStudents.find(function(s){return s.student_id===studentId;});
-  var [results,lectureProgress]=await Promise.all([
+  var [results,lectureProgress,lectures]=await Promise.all([
     sbFetch('test_results?user_id=eq.'+encodeURIComponent(studentId)+'&order=submitted_at.desc'),
-    sbFetch('lecture_progress?user_id=eq.'+encodeURIComponent(studentId))
+    sbFetch('lecture_progress?user_id=eq.'+encodeURIComponent(studentId)),
+    sbFetch('lectures?select=id,title&order=sort_order.asc,created_at.asc')
   ]);
-  var lectures=ADMIN_LECTURE_LIST;
   var name=student?student.name:studentId;
   var email=student?(student.email||'—'):'—';
   var tameru=Array.isArray(results)?results.find(function(r){return r.test_id==='tameru';}):null;
@@ -921,16 +905,16 @@ function renderLectures() {
     el.innerHTML = '<div class="empty-state"><div class="empty-icon" style="font-size:36px;margin-bottom:.75rem;">—</div>まだ講義がありません</div>';
     return;
   }
-  el.innerHTML = '<table><thead><tr><th>#</th><th>タイトル</th><th>URL</th><th></th></tr></thead><tbody>'
+  el.innerHTML = '<table><thead><tr><th>#</th><th>タイトル</th><th>S3ファイル名</th><th></th></tr></thead><tbody>'
     + lectureData.map(function(l, i) {
       var safeTitle = l.title.replace(/'/g, "\\'");
-      var safeUrl = (l.url||'').replace(/'/g, "\\'");
+      var safeFile = (l.file||'').replace(/'/g, "\\'");
       return '<tr>'
         + '<td style="color:var(--text-muted);font-family:\'DM Mono\',monospace;font-size:12px;">' + String(i+1).padStart(2,'0') + '</td>'
         + '<td><strong>' + l.title + '</strong></td>'
-        + '<td style="color:var(--text-muted);font-size:12px;">' + (l.url ? '<a href="' + l.url + '" target="_blank" style="color:var(--accent);">' + l.url.substring(0,40) + '…</a>' : '—') + '</td>'
+        + '<td style="color:var(--text-muted);font-size:12px;font-family:monospace">' + (l.file || '—') + '</td>'
         + '<td style="display:flex;gap:.4rem;">'
-        + '<button class="btn btn-outline btn-sm" onclick="editLecture(\'' + l.id + '\',\'' + safeTitle + '\',\'' + safeUrl + '\')">編集</button>'
+        + '<button class="btn btn-outline btn-sm" onclick="editLecture(\'' + l.id + '\',\'' + safeTitle + '\',\'' + safeFile + '\')">編集</button>'
         + '<button class="btn btn-red btn-sm" onclick="deleteLecture(\'' + l.id + '\')">削除</button>'
         + '</td>'
         + '</tr>';
@@ -939,13 +923,13 @@ function renderLectures() {
 
 async function addLecture() {
   var title = document.getElementById('lec-title').value.trim();
-  var url   = document.getElementById('lec-url').value.trim();
+  var file  = document.getElementById('lec-file').value.trim();
   if (!title) { showToast('タイトルを入力してください'); return; }
-  var ok = await sbFetch('lectures','POST',{title:title,url:url,sort_order:lectureData.length});
+  var ok = await sbFetch('lectures','POST',{title:title,file:file,sort_order:lectureData.length});
   if(ok){
     showToast('追加しました：'+title);
     document.getElementById('lec-title').value='';
-    document.getElementById('lec-url').value='';
+    document.getElementById('lec-file').value='';
     loadLectureAdmin();
   }else{
     showToast('追加に失敗しました');
@@ -960,10 +944,10 @@ async function deleteLecture(id) {
 }
 
 var _editingLectureId=null;
-function editLecture(id, currentTitle, currentUrl){
+function editLecture(id, currentTitle, currentFile){
   _editingLectureId=id;
   document.getElementById('lec-title').value=currentTitle;
-  document.getElementById('lec-url').value=currentUrl||'';
+  document.getElementById('lec-file').value=currentFile||'';
   document.getElementById('lec-form-title').textContent='講義を編集';
   document.getElementById('lec-submit-btn').textContent='更新';
   document.getElementById('lec-submit-btn').onclick=saveLectureEdit;
@@ -973,7 +957,7 @@ function editLecture(id, currentTitle, currentUrl){
 function cancelEditLecture(){
   _editingLectureId=null;
   document.getElementById('lec-title').value='';
-  document.getElementById('lec-url').value='';
+  document.getElementById('lec-file').value='';
   document.getElementById('lec-form-title').textContent='講義を追加';
   document.getElementById('lec-submit-btn').textContent='+ 追加';
   document.getElementById('lec-submit-btn').onclick=addLecture;
@@ -981,9 +965,9 @@ function cancelEditLecture(){
 }
 async function saveLectureEdit(){
   var title=document.getElementById('lec-title').value.trim();
-  var url=document.getElementById('lec-url').value.trim();
+  var file=document.getElementById('lec-file').value.trim();
   if(!title){showToast('タイトルを入力してください');return;}
-  await sbFetch('lectures?id=eq.'+_editingLectureId,'PATCH',{title:title,url:url});
+  await sbFetch('lectures?id=eq.'+_editingLectureId,'PATCH',{title:title,file:file});
   showToast('更新しました');
   cancelEditLecture();
   loadLectureAdmin();
@@ -993,13 +977,14 @@ async function saveLectureEdit(){
 async function loadProgress(){
   var el=document.getElementById('progress-table');
   el.innerHTML='<div class="loading"><div class="spinner"></div>読み込み中</div>';
-  var [students,tameru,fuyasu,lectureProgress]=await Promise.all([
+  var [students,tameru,fuyasu,lectureProgress,lectures]=await Promise.all([
     sbFetch('students?order=created_at.asc'),
     sbFetch('test_results?test_id=eq.tameru&select=user_id,score,max_score'),
     sbFetch('test_results?test_id=eq.fuyasu&select=user_id,score,max_score'),
-    sbFetch('lecture_progress?select=user_id,lecture_id')
+    sbFetch('lecture_progress?select=user_id,lecture_id'),
+    sbFetch('lectures?select=id,title&order=sort_order.asc,created_at.asc')
   ]);
-  var totalLectures=ADMIN_LECTURE_LIST.length;
+  var totalLectures=(Array.isArray(lectures)?lectures.length:0);
   var tMap={},fMap={},lpMap={};
   if(Array.isArray(tameru))tameru.forEach(function(r){if(!tMap[r.user_id])tMap[r.user_id]=r;});
   if(Array.isArray(fuyasu))fuyasu.forEach(function(r){if(!fMap[r.user_id])fMap[r.user_id]=r;});

@@ -538,7 +538,7 @@ async function doLogin(){
     var e=document.getElementById('login-error');e.textContent='通信エラーが発生しました（'+err.message+'）';e.style.display='block';
   }
 }
-function doLogout(){currentUser=null;supabaseAccessToken=null;completedTests={};answers={};if(timerInterval){clearInterval(timerInterval);timerInterval=null;}if(_activityCheckTimer){clearInterval(_activityCheckTimer);_activityCheckTimer=null;}_clearSession();showScreen('login');document.getElementById('login-id').value='';document.getElementById('login-pw').value='';}
+function doLogout(){_lectureCache=null;currentUser=null;supabaseAccessToken=null;completedTests={};answers={};if(timerInterval){clearInterval(timerInterval);timerInterval=null;}if(_activityCheckTimer){clearInterval(_activityCheckTimer);_activityCheckTimer=null;}_clearSession();showScreen('login');document.getElementById('login-id').value='';document.getElementById('login-pw').value='';}
 document.getElementById('login-pw').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 document.getElementById('login-id').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 
@@ -685,41 +685,39 @@ function markCurrentLectureDone() {
 // 新しい動画を追加する時はここにオブジェクトを1行追加するだけ！
 // id: 任意のユニークな番号、title: 表示名、file: S3のファイル名
 // ============================================================
-var LECTURE_LIST = [
-  { id:'l01', title:'ローソク足の見方',                          file:'ローソク足の見方.mp4' },
-  { id:'l02', title:'出来高の見方',                              file:'【株価チャートの基本】出来高の見方.mp4' },
-  { id:'l03', title:'テクニカル分析の原則',                      file:'テクニカル分析の原則.mp4' },
-  { id:'l04', title:'トレンドの種類',                            file:'トレンドの種類.m4v' },
-  { id:'l05', title:'トレンドラインの引き方',                    file:'トレンドラインの引き方.m4v' },
-  { id:'l06', title:'トレンドラインの引き方実践',                file:'トレンドラインの引き方実践.mp4' },
-  { id:'l07', title:'トレンドラインの役割・引き方',              file:'トレンドラインの役割・引き方.m4v' },
-  { id:'l08', title:'トレンドラインの使い方',                    file:'【テクニカル分析】トレンドラインの使い方.mp4' },
-  { id:'l09', title:'トレンド別の投資判断',                      file:'トレンド別の投資判断.m4v' },
-  { id:'l10', title:'水平線の引き方',                            file:'水平線の引き方.mp4' },
-  { id:'l11', title:'水平線を引いてみよう【TradingView】',        file:'水平線を引いてみよう【TradingView】.m4v' },
-  { id:'l12', title:'移動平均線の見方',                          file:'移動平均線の見方.m4v' },
-  { id:'l13', title:'TradingViewの使い方',                       file:'tradingview.mp4' },
-  { id:'l14', title:'銘柄スクリーニング機能を使いこなそう',      file:'銘柄スクリーニング機能を使いこなそう.m4v' },
-];
+var _lectureCache = null;
 
 function loadLectures(){
   var wrap = document.getElementById('lecture-list-wrap');
-  var lectures = LECTURE_LIST;
-  if(!lectures.length){
-    wrap.innerHTML='<div style="padding:1.5rem;text-align:center;color:var(--text-muted);font-size:13px;">現在講義はありません</div>';
-    return;
-  }
-  var pkey = 'lecture_progress_' + currentUser.id;
-  var prog = JSON.parse(localStorage.getItem(pkey) || '{}');
-  // Supabaseから最新進捗を取得してローカルを更新
-  sbFetch('lecture_progress?user_id=eq.' + encodeURIComponent(currentUser.id) + '&select=lecture_id').then(function(rows){
-    if(rows && rows.length) {
-      rows.forEach(function(r){ prog[r.lecture_id] = true; });
-      localStorage.setItem(pkey, JSON.stringify(prog));
-      loadLectures();
+  wrap.innerHTML='<div style="padding:1.5rem;text-align:center;color:var(--text-muted);font-size:13px;">読み込み中...</div>';
+  function render(lectures){
+    if(!lectures||!lectures.length){
+      wrap.innerHTML='<div style="padding:1.5rem;text-align:center;color:var(--text-muted);font-size:13px;">現在講義はありません</div>';
+      return;
     }
-  }).catch(function(){});
-  var done = lectures.filter(function(l){ return prog[l.id]; }).length;
+    var pkey = 'lecture_progress_' + currentUser.id;
+    var prog = JSON.parse(localStorage.getItem(pkey) || '{}');
+    // Supabaseから最新進捗を取得してローカルを更新
+    fetch(SUPABASE_URL+'/rest/v1/lecture_progress?user_id=eq.'+encodeURIComponent(currentUser.id)+'&select=lecture_id',{
+      headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+    }).then(function(r){return r.json();}).then(function(rows){
+      if(rows && rows.length){
+        rows.forEach(function(r){ prog[String(r.lecture_id)] = true; });
+        localStorage.setItem(pkey, JSON.stringify(prog));
+      }
+      _renderLectureList(lectures, prog, wrap);
+    }).catch(function(){ _renderLectureList(lectures, prog, wrap); });
+  }
+  if(_lectureCache){render(_lectureCache);return;}
+  fetch(SUPABASE_URL+'/rest/v1/lectures?order=sort_order.asc,created_at.asc&select=id,title,file',{
+    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}
+  }).then(function(r){return r.json();}).then(function(data){
+    _lectureCache=Array.isArray(data)?data:[];
+    render(_lectureCache);
+  }).catch(function(){render([]);});
+}
+function _renderLectureList(lectures, prog, wrap){
+  var done = lectures.filter(function(l){ return prog[String(l.id)]; }).length;
   var pct  = Math.round(done / lectures.length * 100);
   var html = '<div class="lecture-progress-wrap">'
     + '<div class="lecture-progress-label">進捗</div>'
@@ -727,14 +725,13 @@ function loadLectures(){
     + '<div class="lecture-progress-pct">'+done+' / '+lectures.length+'（'+pct+'%）</div>'
     + '</div>';
   lectures.forEach(function(l, i){
-    var d = !!prog[l.id];
-    var playBtn = '<button class="lecture-play-btn" onclick="openVideoModal('
-      + "'"+l.id+"',"
-      + "'"+l.title.replace(/'/g,"\\'")+"',"
-      + "'"+l.file.replace(/'/g,"\\'")+"'"
-      + ')">'+(d ? '▶ 再視聴' : '▶ 視聴する')+'</button>';
-    html += '<div class="lecture-item'+(d?' done':'')+'" id="lec-'+l.id+'">'
-      + '<div class="lecture-check" data-lid="'+l.id+'" onclick="toggleLectureBtn(this)"><span class="lecture-check-mark">✓</span></div>'
+    var lid = String(l.id);
+    var d = !!prog[lid];
+    var safeTitle = l.title.replace(/'/g,"\\'");
+    var safeFile  = (l.file||'').replace(/'/g,"\\'");
+    var playBtn = '<button class="lecture-play-btn" onclick="openVideoModal(\''+lid+'\',\''+safeTitle+'\',\''+safeFile+'\')">'+(d ? '▶ 再視聴' : '▶ 視聴する')+'</button>';
+    html += '<div class="lecture-item'+(d?' done':'')+'" id="lec-'+lid+'">'
+      + '<div class="lecture-check" data-lid="'+lid+'" onclick="toggleLectureBtn(this)"><span class="lecture-check-mark">✓</span></div>'
       + '<div class="lecture-info">'
       +   '<div class="lecture-no">講義 '+String(i+1).padStart(2,'0')+'</div>'
       +   '<div class="lecture-title">'+l.title+'</div>'
@@ -838,7 +835,7 @@ async function loadMessages(){
 }
 function markRead(id){/* タップ時の既読処理は loadMessages内で一括処理済み */}
 
-function toggleLecture(lid){var pkey='lecture_progress_'+currentUser.id;var prog=JSON.parse(localStorage.getItem(pkey)||'{}');prog[lid]=!prog[lid];localStorage.setItem(pkey,JSON.stringify(prog));loadLectures();}
+function toggleLecture(lid){var pkey='lecture_progress_'+currentUser.id;var prog=JSON.parse(localStorage.getItem(pkey)||'{}');prog[String(lid)]=!prog[String(lid)];localStorage.setItem(pkey,JSON.stringify(prog));_lectureCache=null;loadLectures();}
 
 function goToIntro(testId){
   if(!currentUser||completedTests[testId])return;
