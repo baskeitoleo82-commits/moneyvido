@@ -650,8 +650,8 @@ async function openStudentDetail(studentId){
         +'</div>';
     }).join('');
   }
-  var safeId=(studentId||'').replace(/'/g,"\'");
-  var safeName=(name||'').replace(/'/g,"\'");
+  var safeId=(studentId||'').replace(/'/g,"\\'");
+  var safeName=(name||'').replace(/'/g,"\\'");
   document.getElementById('student-detail-name').textContent=name;
   body.innerHTML=
     '<div style="margin-bottom:1.5rem">'
@@ -678,9 +678,9 @@ async function openStudentDetail(studentId){
       +lecRows
     +'</div>'
     +'<div style="display:flex;gap:.6rem;flex-wrap:wrap;padding-top:.5rem;border-top:1px solid #e2e8f0">'
-      +'<button class="btn btn-outline btn-sm" onclick="openDMModal(''+safeId+'',''+safeName+'')">DM送信</button>'
-      +(tameru?'<button class="btn btn-red btn-sm" onclick="resetTest(''+safeId+'','tameru')">貯める力リセット</button>':'')
-      +(fuyasu?'<button class="btn btn-red btn-sm" onclick="resetTest(''+safeId+'','fuyasu')">増やす力リセット</button>':'')
+      +'<button class="btn btn-outline btn-sm" onclick="openDMModal(\''+safeId+'\',\''+safeName+'\')">DM送信</button>'
+      +(tameru?'<button class="btn btn-red btn-sm" onclick="resetTest(\''+safeId+'\',\'tameru\')">貯める力リセット</button>':'')
+      +(fuyasu?'<button class="btn btn-red btn-sm" onclick="resetTest(\''+safeId+'\',\'fuyasu\')">増やす力リセット</button>':'')
     +'</div>';
 }
 function closeStudentDetail(){document.getElementById('student-detail-modal').style.display='none';}
