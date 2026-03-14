@@ -394,6 +394,36 @@ var allQuestions=[],answers={},remainSec=45*60,timerInterval=null;
 var currentQIndex=0,completedTests={};
 var supabaseAccessToken = null;
 
+// ── セッション管理 ──
+var MA_SESSION_KEY='ma_session';
+var MA_TIMEOUT=2*60*60*1000; // 2時間
+var _activityCheckTimer=null;
+
+function _saveSession(){
+  if(!currentUser)return;
+  localStorage.setItem(MA_SESSION_KEY,JSON.stringify({user:currentUser,token:supabaseAccessToken,lastActivity:Date.now()}));
+}
+function _clearSession(){
+  localStorage.removeItem(MA_SESSION_KEY);
+}
+function _touchActivity(){
+  if(!currentUser)return;
+  var raw=localStorage.getItem(MA_SESSION_KEY);
+  if(!raw)return;
+  var s=JSON.parse(raw);s.lastActivity=Date.now();
+  localStorage.setItem(MA_SESSION_KEY,JSON.stringify(s));
+}
+function _startSessionWatch(){
+  if(_activityCheckTimer)clearInterval(_activityCheckTimer);
+  _activityCheckTimer=setInterval(function(){
+    var raw=localStorage.getItem(MA_SESSION_KEY);
+    if(!raw){doLogout();return;}
+    var s=JSON.parse(raw);
+    if(Date.now()-s.lastActivity>MA_TIMEOUT){doLogout();showToast('セッションが期限切れです。再ログインしてください。');}
+  },60000);
+}
+['click','keydown','touchstart'].forEach(function(t){document.addEventListener(t,_touchActivity,true);});
+
 function showScreen(id){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active');});document.getElementById('screen-'+id).classList.add('active');window.scrollTo(0,0);}
 var toastTimer;
 function showToast(msg){var el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(function(){el.classList.remove('show');},3000);}
@@ -418,6 +448,8 @@ async function doLogin(){
     var userId = (res.user && res.user.id) ? res.user.id : res.sub;
     currentUser={id:userId,email:email,name:name};
     completedTests={};
+    _saveSession();
+    _startSessionWatch();
     goToDashboard();
   } catch(err) {
     console.error('Login error:', err);
@@ -425,7 +457,7 @@ async function doLogin(){
     var e=document.getElementById('login-error');e.textContent='通信エラーが発生しました（'+err.message+'）';e.style.display='block';
   }
 }
-function doLogout(){currentUser=null;supabaseAccessToken=null;completedTests={};answers={};if(timerInterval){clearInterval(timerInterval);timerInterval=null;}showScreen('login');document.getElementById('login-id').value='';document.getElementById('login-pw').value='';}
+function doLogout(){currentUser=null;supabaseAccessToken=null;completedTests={};answers={};if(timerInterval){clearInterval(timerInterval);timerInterval=null;}if(_activityCheckTimer){clearInterval(_activityCheckTimer);_activityCheckTimer=null;}_clearSession();showScreen('login');document.getElementById('login-id').value='';document.getElementById('login-pw').value='';}
 document.getElementById('login-pw').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 document.getElementById('login-id').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});
 
@@ -1154,5 +1186,21 @@ function submitProfile() {
   </div>
 </div>
 
+<script>
+// ── ページロード時にセッション復元 ──
+(function(){
+  try{
+    var raw=localStorage.getItem(MA_SESSION_KEY);
+    if(!raw)return;
+    var s=JSON.parse(raw);
+    if(!s||!s.user||!s.token)return;
+    if(Date.now()-s.lastActivity>MA_TIMEOUT){localStorage.removeItem(MA_SESSION_KEY);return;}
+    currentUser=s.user;
+    supabaseAccessToken=s.token;
+    _startSessionWatch();
+    goToDashboard();
+  }catch(e){}
+})();
+</script>
 </body>
 </html>
